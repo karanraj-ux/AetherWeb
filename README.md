@@ -55,14 +55,20 @@ Small moments where AetherWeb changes everything:
 
 ## ✨ Features
 
-- 💬 **Mesh chat** — group messaging that hops across phones, stored locally
-- 🎙️ **Voice notes, calls & live voice/video** over the local mesh
-- 📁 **High-speed file transfer** — share documents, photos, and media phone-to-phone
-- 🎮 **Offline mini-games** — chess, ludo, polls, and minigames with live sync
+### 🌟 The showstoppers — every one works with **zero internet**
+
+- 📹 **Video calls** — face-to-face calling phone-to-phone over the local mesh. No carrier, no mobile data, no server in the middle.
+- 🎵 **Music together** — the big one. Play music in sync across everyone's phones and vibe together — on a trek, at a protest, on a flight, anywhere.
+- 🎮 **Games** — chess, ludo, polls, and mini-games with live multiplayer sync, all offline.
+- 💬 **Mesh chat** — group messaging that hops phone-to-phone; stored on your device, never on a server.
+- 🎙️ **Audio & voice notes** — send voice notes and talk live over the mesh, clear and instant, no network needed.
+
+### Plus everything else — still 100% offline
+
+- 📁 **High-speed file transfer** — documents, photos, and media, phone-to-phone
 - 🎨 **Shared canvas** — sketch and brainstorm together in real time
 - 🌐 **Zero-install web portal** — your phone hosts web pages; guests join from any browser via QR code
 - 📍 **Off-grid SOS** — location pings and acoustic siren beacons across the mesh
-- 🎵 **Shared music** — listen together, synced across devices
 - 🔒 **Private by design** — everything stays between devices; no cloud, no tracking
 
 ---
