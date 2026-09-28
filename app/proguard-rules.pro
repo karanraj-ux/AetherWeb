@@ -82,12 +82,12 @@
 -dontwarn androidx.room.paging.**
 
 # Protocol & Domain Models
--keep class com.example.protocol.** { *; }
--keepclassmembers class com.example.protocol.** { *; }
--keep class com.example.data.** { *; }
--keepclassmembers class com.example.data.** { *; }
--keep class com.example.models.** { *; }
--keepclassmembers class com.example.models.** { *; }
+-keep class com.aetherweb.app.protocol.** { *; }
+-keepclassmembers class com.aetherweb.app.protocol.** { *; }
+-keep class com.aetherweb.app.data.** { *; }
+-keepclassmembers class com.aetherweb.app.data.** { *; }
+-keep class com.aetherweb.app.models.** { *; }
+-keepclassmembers class com.aetherweb.app.models.** { *; }
 
 # Serialization / JSON
 -keepclassmembers class * {
@@ -96,21 +96,25 @@
 }
 
 # Android Architecture Components & Services
--keep public class com.example.MeshForegroundService { *; }
--keep public class com.example.NotificationReceiver { *; }
--keep public class com.example.BootReceiver { *; }
--keep public class com.example.MainActivity { *; }
+-keep public class com.aetherweb.app.MeshForegroundService { *; }
+-keep public class com.aetherweb.app.NotificationReceiver { *; }
+-keep public class com.aetherweb.app.BootReceiver { *; }
+-keep public class com.aetherweb.app.MainActivity { *; }
 
 # WebServer & Embedded Engine
--keep class com.example.WebServerManager** { *; }
--keep class com.example.WebPortalTemplate** { *; }
--keep class com.example.HighSpeedFileTransferManager** { *; }
--keep class com.example.WifiClusterBridgeManager** { *; }
--keep class com.example.CallManager** { *; }
--keep class com.example.LiveVoiceManager** { *; }
--keep class com.example.LiveVideoManager** { *; }
--keep class com.example.AudioJitterBuffer** { *; }
+-keep class com.aetherweb.app.WebServerManager** { *; }
+-keep class com.aetherweb.app.WebPortalTemplate** { *; }
+-keep class com.aetherweb.app.HighSpeedFileTransferManager** { *; }
+-keep class com.aetherweb.app.WifiClusterBridgeManager** { *; }
+-keep class com.aetherweb.app.CallManager** { *; }
+-keep class com.aetherweb.app.LiveVoiceManager** { *; }
+-keep class com.aetherweb.app.LiveVideoManager** { *; }
+-keep class com.aetherweb.app.AudioJitterBuffer** { *; }
 
 # Keep Line Numbers for Stacktraces in R8
 -keepattributes SourceFile,LineNumberTable
 
+
+# Netty's shaded jctools references OSGi annotations that exist only at compile time.
+# Without this, R8 fails the release build with "Missing class org.osgi.annotation.bundle.Export".
+-dontwarn org.osgi.**
