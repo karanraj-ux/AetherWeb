@@ -9,6 +9,9 @@
 
 **Video calls, music, games, and chat — with zero internet. And your friends don't even need the app.**
 
+### ⬇️ Get the app — no Play Store needed
+**[Download the latest APK](https://github.com/karanraj-ux/AetherWeb/releases/latest)** · On your phone, tap the APK and allow *Install unknown apps* when asked. For automatic updates, point [Obtainium](https://obtainium.imranr.dev/) at this repo's releases.
+
 ---
 
 ## 👀 Imagine this
