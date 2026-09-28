@@ -1,90 +1,96 @@
 # 🌌 AetherWeb
-### *The Invisible Offline Web — in your pocket.*
+### *Your phone is the network. No internet needed.*
 
 [![Platform](https://img.shields.io/badge/Platform-Android-brightgreen.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
-[![Offline](https://img.shields.io/badge/Works-100%25_Offline-orange.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
+[![Offline](https://img.shields.io/badge/Calls_Chats_Games-100%25_Offline-orange.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
 [![Mesh](https://img.shields.io/badge/Network-BLE_Mesh-blueviolet.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
-[![Zero Install](https://img.shields.io/badge/Guests-No_App_Needed-blue.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
+[![Zero Install](https://img.shields.io/badge/For_Friends-No_App_Needed-blue.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
 [![Privacy](https://img.shields.io/badge/Cloud-Zero-success.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
 
-**Chat, share files, host websites, and play with physics — with zero internet, zero cell towers, zero cloud.** AetherWeb turns nearby phones into their own private network using silent Bluetooth radio waves.
+**Video calls, music, games, and chat — with zero internet. And your friends don't even need the app.**
 
 ---
 
 ## 👀 Imagine this
 
-> You're at a protest. The internet is shut down. Jammers are up. But your group chat still works — messages hopping phone-to-phone through the air.
+> You're at a protest. The internet is shut down, jammers are up. Your group chat still works — messages hopping phone-to-phone through the air.
 
-> You're on a flight with friends. No Wi-Fi. You're still sharing photos, playing chess, and chatting — the whole cabin is your network.
+> Your friend doesn't have the app. Doesn't matter. They scan the QR code on your screen and join straight from their browser — no install, no App Store, no sign-up.
 
-> You're trekking in the mountains. No signal for miles. One tap broadcasts your location and an SOS siren across every phone in your group.
+> You're on a flight with friends. No Wi-Fi. You're on a video call, vibing to the same music in perfect sync, mid chess game — the whole cabin is your network.
 
-That's AetherWeb. Not a demo, not a concept — a working Android app.
+That's AetherWeb. A working Android app, not a concept.
 
 ---
 
 ## 📱 What is AetherWeb?
 
-In old physics, the **Aether** was the invisible medium believed to connect everything in space. AetherWeb brings that idea to life: your phone becomes a node in an invisible, local web woven from Bluetooth radio.
+AetherWeb turns nearby phones into their own private network using Bluetooth radio. Your phone becomes the tower, the server, and the app — all at once.
 
-No accounts. No servers. No internet. Just phones talking directly to phones.
+- **No internet, no cell towers, no cloud.** Phones talk directly to phones.
+- **No accounts, no sign-ups, no tracking.**
+- **No app needed for guests.** Anyone nearby joins from their browser via QR code.
 
-It packs **two breakthroughs in one app**:
+It stands on two simple ideas:
 
-| 📡 **BLE Mesh Network** | ⚛️ **Live Physics Laboratory** |
+| 📡 **Phones become the network** | 📲 **Nobody needs to install anything** |
 |---|---|
-| Phones link through the air using low-energy Bluetooth. Messages and files hop from phone to phone, so the network grows stronger with every person who joins. | A real-time interactive physics sandbox — gravity, collisions, springs, friction — that multiple people can play with together, live. |
+| Messages, calls, and files hop from phone to phone over Bluetooth mesh — automatically upgrading to fast local Wi-Fi for heavy stuff like video. The more people join, the stronger it gets. | Your phone is also a tiny web server. Friends on iPhone, laptop, anything — they scan, tap, and they're inside your world through Chrome or Safari. |
 
 ---
 
-## 🌍 Real life, real use cases
+## 🤯 The "woah" moments
 
-Small moments where AetherWeb changes everything:
+The features people don't believe until they see them:
 
-- ✊ **Protests & internet shutdowns** — When authorities cut mobile data or deploy jammers, AetherWeb keeps working. Coordinate with your group, share updates and locations — entirely off the grid, with no central server to block.
-- 🎓 **Classroom with no Wi-Fi** — A teacher shares notes, PDFs, and videos directly to every student's phone. Students collaborate on a shared canvas in real time.
-- ✈️ **Flights & road trips** — Stuck without connectivity? Chat, share trip photos, and play chess or ludo with your travel buddies.
-- 🏕️ **Trekking & camping** — Deep in the mountains with no signal: broadcast GPS pings and a loud SOS siren across all connected phones with one tap.
-- 🎪 **Concerts & festivals** — 50,000 people crushing the cell network? Share photos and find your friends phone-to-phone instead.
-- 🏠 **Hostel life** — Send movies, assignments, and music to roommates at high speed without burning mobile data.
-- ⚡ **Blackouts & disasters** — When towers go down in a storm or earthquake, the mesh keeps neighborhoods communicating.
-- ⚛️ **Physics students** — Drop objects, tweak gravity and friction live, and watch friends across the room launch objects into your shared simulation.
-- 💻 **Builders & creators** — Host a website or demo straight from your phone. Friends open it in their browser via QR code — no app install, no App Store, no login.
+- 📹 **Video calls with zero internet** — face-to-face calling, WhatsApp-style, with no carrier, no mobile data, and no server in the middle.
+- 🎙️ **Audio calls & voice notes** — clear voice calls and voice notes traveling through thin air.
+- 🎵 **Music in perfect sync** — everyone hears the same song at the exact same time. A silent disco with no internet, anywhere on Earth.
+- 🎮 **Games together** — chess, ludo, polls, and mini-games with live multiplayer. Game night no longer needs Wi-Fi.
+- 💬 **Chat that can't be shut down** — group messaging with no central server, so there is nothing to block, throttle, or switch off.
+- 📲 **The other person needs no APK** — the magic trick. Show your QR code, they scan it, and they're in your call, game, or page from their browser.
+- 💻 **Your own corner of the web** — host web pages, tools, and game packs straight from your pocket and share them locally.
 
 ---
 
-## ✨ Features
+## 🌍 Where it shines
 
-### 🌟 The showstoppers — every one works with **zero internet**
+- ✊ **Protests & internet shutdowns** — coordinate with your group when networks are cut or jammed. No server means nothing to block.
+- 🎓 **Classrooms with no Wi-Fi** — push notes, PDFs, and videos to every student's phone; collaborate live.
+- ✈️ **Flights & road trips** — video calls, synced music, and games with your travel crew, completely offline.
+- 🏕️ **Trekking & camping** — no signal for miles? One tap sends location pings and a loud SOS siren across every connected phone.
+- 🎪 **Concerts & festivals** — 50,000 people crushing the cell towers? Find your friends and share photos phone-to-phone instead.
+- 🏠 **Hostels** — movies, assignments, and music to roommates at full speed, zero mobile data burned.
+- ⚡ **Blackouts & disasters** — when the grid goes down, the mesh keeps the neighborhood talking.
 
-- 📹 **Video calls** — face-to-face calling phone-to-phone over the local mesh. No carrier, no mobile data, no server in the middle.
-- 🎵 **Music together** — the big one. Play music in sync across everyone's phones and vibe together — on a trek, at a protest, on a flight, anywhere.
-- 🎮 **Games** — chess, ludo, polls, and mini-games with live multiplayer sync, all offline.
-- 💬 **Mesh chat** — group messaging that hops phone-to-phone; stored on your device, never on a server.
-- 🎙️ **Audio & voice notes** — send voice notes and talk live over the mesh, clear and instant, no network needed.
+---
 
-### Plus everything else — still 100% offline
+## ✨ Everything inside
 
-- 📁 **High-speed file transfer** — documents, photos, and media, phone-to-phone
-- 🎨 **Shared canvas** — sketch and brainstorm together in real time
-- 🌐 **Zero-install web portal** — your phone hosts web pages; guests join from any browser via QR code
-- 📍 **Off-grid SOS** — location pings and acoustic siren beacons across the mesh
-- 🔒 **Private by design** — everything stays between devices; no cloud, no tracking
+- 📹 Video calls & 🎙️ audio calls — with zero internet
+- 🎵 Synced group music — everyone hears it together
+- 🎮 Chess, ludo, polls & mini-games — live multiplayer, offline
+- 💬 Mesh group chat + voice notes
+- 📁 High-speed file & media transfer, phone-to-phone
+- 🎨 Shared real-time canvas — sketch together live
+- 🌐 Zero-install web portal — QR code → any browser → they're in
+- 📍 Off-grid SOS beacons & location pings
+- 🔒 Private by design — no cloud, no accounts, no tracking
 
 ---
 
 ## 🔧 How it works (for the curious)
 
-**The simple version:** Your phone constantly whispers to nearby phones over Bluetooth Low Energy. When you send a message, it hops from phone to phone until it reaches its destination — like a relay race. For heavy stuff (files, voice, video), phones spin up a fast local Wi-Fi link automatically. And your phone can act as a tiny web server, so anyone nearby can open your pages in their browser.
+**The simple version:** Your phone constantly whispers to nearby phones over Bluetooth Low Energy. Messages hop phone-to-phone like a relay race until they reach their destination. For heavy stuff — video, files, music — phones automatically spin up a fast local Wi-Fi link between themselves. And your phone doubles as a tiny web server, so anyone nearby can open your pages in their browser via QR code.
 
 **The technical version:**
-- **Mesh layer** — Custom BLE mesh protocol with packet framing, multi-hop routing, and a dispatcher (`protocol/`, `BleMeshManager`, `MeshRouter`)
-- **Transport upgrade** — Automatic handoff to high-throughput Wi-Fi socket/hotspot links for files and media (`WifiSocketManager`, `HotspotManager`, `HighSpeedFileTransferManager`)
-- **Local web server** — Embedded Ktor (Netty) server hosting SPAs and a developer portal; QR-code onboarding for browser guests (`WebServerManager`, `WebPortalTemplate`)
-- **Real-time sync** — State synchronization for physics, canvas, and games across mesh nodes
+- **Mesh layer** — custom BLE mesh protocol with packet framing, multi-hop routing, and a dispatcher (`protocol/`, `BleMeshManager`, `MeshRouter`)
+- **Transport upgrade** — automatic handoff to high-throughput Wi-Fi sockets / hotspot links for media (`WifiSocketManager`, `HotspotManager`, `HighSpeedFileTransferManager`)
+- **Local web server** — embedded Ktor (Netty) server hosting pages, tools, and the guest portal; QR-code onboarding for browser guests (`WebServerManager`, `WebPortalTemplate`)
+- **Real-time sync** — live state synchronization for canvas, games, music, and calls across mesh nodes
 - **Crypto** — Diffie-Hellman-derived keys for encrypted mesh traffic (`CryptoManager`)
 - **Persistence** — Room database for chat history, DataStore for preferences
-- **Background operation** — Foreground service keeps the mesh alive with minimal battery drain
+- **Background operation** — foreground service keeps the mesh alive on minimal battery
 
 ---
 
@@ -111,18 +117,18 @@ git clone https://github.com/karanraj-ux/AetherWeb.git
 cd AetherWeb
 ```
 
-Then open the project in Android Studio — it will offer to generate the Gradle wrapper on first open — and hit **Run**. For a release build, CI handles signing via GitHub Actions (see `.github/workflows/android.yml`).
+Open the project in Android Studio (it will offer to generate the Gradle wrapper on first open) and hit **Run**. Release builds are handled by CI — see `.github/workflows/android.yml`.
 
-> 💡 **Try it with a friend:** install the app on two phones, keep them nearby, and watch them discover each other — no internet needed.
+> 💡 **Try it with a friend:** install it on two phones, keep them nearby, and watch them discover each other — no internet. Then get a third friend *without* the app to scan your QR code and join from their browser.
 
 ---
 
 ## 🔒 Privacy
 
-- **Zero cloud** — messages, files, and simulations never leave the mesh
+- **Zero cloud** — calls, messages, files, and music never leave the mesh
 - **No accounts** — no phone numbers, no emails, no logins
 - **No tracking** — no analytics, no cookies, no ads
-- **Your network, your rules** — works even when the internet doesn't
+- **Your network, your rules** — it works even when the internet doesn't
 
 ---
 
