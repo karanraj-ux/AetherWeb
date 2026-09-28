@@ -1,107 +1,123 @@
 # 🌌 AetherWeb
-### *The Invisible Offline Web, Collaborative Dev Studio & Interactive Physics Laboratory*
+### *The Invisible Offline Web — in your pocket.*
 
-[![Platform](https://img.shields.io/badge/Platform-Android_Phone-brightgreen.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
-[![Status](https://img.shields.io/badge/Operates-100%25_Offline-orange.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
-[![Innovation](https://img.shields.io/badge/Dual_Engine-BLE_Mesh_%2B_Live_Physics-blueviolet.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
-[![Zero Install](https://img.shields.io/badge/Guest_Access-Any_Browser_(No_App)-blue.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
-[![Privacy](https://img.shields.io/badge/Zero_Cloud-100%25_Private-success.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
+[![Platform](https://img.shields.io/badge/Platform-Android-brightgreen.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
+[![Offline](https://img.shields.io/badge/Works-100%25_Offline-orange.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
+[![Mesh](https://img.shields.io/badge/Network-BLE_Mesh-blueviolet.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
+[![Zero Install](https://img.shields.io/badge/Guests-No_App_Needed-blue.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
+[![Privacy](https://img.shields.io/badge/Cloud-Zero-success.svg?style=for-the-badge)](https://github.com/karanraj-ux/AetherWeb)
 
----
-
-## ⚡ What is AetherWeb?
-
-In classical physics, the **Aether** was believed to be the invisible, universal medium connecting all points in space. 
-
-**AetherWeb** brings that concept to life. It transforms your phone into an autonomous, pocket-sized **offline web laboratory, development studio, and real-time physics playground**. 
-
-By weaving nearby phones into a silent, low-energy Bluetooth radio mesh, AetherWeb lets you build, simulate motion and gravity, and collaborate with peers anywhere on Earth—**zero internet, zero cell towers, and zero cloud required.**
+**Chat, share files, host websites, and play with physics — with zero internet, zero cell towers, zero cloud.** AetherWeb turns nearby phones into their own private network using silent Bluetooth radio waves.
 
 ---
 
-## 🛑 The Problem: The Fragility of Cloud Tools
+## 👀 Imagine this
 
-Modern creative tools, web development playgrounds, and science simulators assume you are constantly connected to corporate servers. 
+> You're at a protest. The internet is shut down. Jammers are up. But your group chat still works — messages hopping phone-to-phone through the air.
 
-When you are:
-- ✈️ Traveling on flights, trains, or subway commutes
-- 🏕️ In wilderness camps, national parks, or remote field research
-- 🏫 In classrooms with restricted or intermittent Wi-Fi
-- ⚡ Facing power blackouts, severe storms, or network throttling
+> You're on a flight with friends. No Wi-Fi. You're still sharing photos, playing chess, and chatting — the whole cabin is your network.
 
-...traditional tools fail. Cloud IDEs disconnect, browser tabs crash, and collaborative work grinds to a halt.
+> You're trekking in the mountains. No signal for miles. One tap broadcasts your location and an SOS siren across every phone in your group.
 
-**AetherWeb makes creation completely self-sufficient.** Both the computing engine and the peer-to-peer network live right inside your pocket.
+That's AetherWeb. Not a demo, not a concept — a working Android app.
 
 ---
 
-## 🌟 The Core Value: Two Breakthroughs in One Tool
+## 📱 What is AetherWeb?
 
+In old physics, the **Aether** was the invisible medium believed to connect everything in space. AetherWeb brings that idea to life: your phone becomes a node in an invisible, local web woven from Bluetooth radio.
+
+No accounts. No servers. No internet. Just phones talking directly to phones.
+
+It packs **two breakthroughs in one app**:
+
+| 📡 **BLE Mesh Network** | ⚛️ **Live Physics Laboratory** |
+|---|---|
+| Phones link through the air using low-energy Bluetooth. Messages and files hop from phone to phone, so the network grows stronger with every person who joins. | A real-time interactive physics sandbox — gravity, collisions, springs, friction — that multiple people can play with together, live. |
+
+---
+
+## 🌍 Real life, real use cases
+
+Small moments where AetherWeb changes everything:
+
+- ✊ **Protests & internet shutdowns** — When authorities cut mobile data or deploy jammers, AetherWeb keeps working. Coordinate with your group, share updates and locations — entirely off the grid, with no central server to block.
+- 🎓 **Classroom with no Wi-Fi** — A teacher shares notes, PDFs, and videos directly to every student's phone. Students collaborate on a shared canvas in real time.
+- ✈️ **Flights & road trips** — Stuck without connectivity? Chat, share trip photos, and play chess or ludo with your travel buddies.
+- 🏕️ **Trekking & camping** — Deep in the mountains with no signal: broadcast GPS pings and a loud SOS siren across all connected phones with one tap.
+- 🎪 **Concerts & festivals** — 50,000 people crushing the cell network? Share photos and find your friends phone-to-phone instead.
+- 🏠 **Hostel life** — Send movies, assignments, and music to roommates at high speed without burning mobile data.
+- ⚡ **Blackouts & disasters** — When towers go down in a storm or earthquake, the mesh keeps neighborhoods communicating.
+- ⚛️ **Physics students** — Drop objects, tweak gravity and friction live, and watch friends across the room launch objects into your shared simulation.
+- 💻 **Builders & creators** — Host a website or demo straight from your phone. Friends open it in their browser via QR code — no app install, no App Store, no login.
+
+---
+
+## ✨ Features
+
+- 💬 **Mesh chat** — group messaging that hops across phones, stored locally
+- 🎙️ **Voice notes, calls & live voice/video** over the local mesh
+- 📁 **High-speed file transfer** — share documents, photos, and media phone-to-phone
+- 🎮 **Offline mini-games** — chess, ludo, polls, and minigames with live sync
+- 🎨 **Shared canvas** — sketch and brainstorm together in real time
+- 🌐 **Zero-install web portal** — your phone hosts web pages; guests join from any browser via QR code
+- 📍 **Off-grid SOS** — location pings and acoustic siren beacons across the mesh
+- 🎵 **Shared music** — listen together, synced across devices
+- 🔒 **Private by design** — everything stays between devices; no cloud, no tracking
+
+---
+
+## 🔧 How it works (for the curious)
+
+**The simple version:** Your phone constantly whispers to nearby phones over Bluetooth Low Energy. When you send a message, it hops from phone to phone until it reaches its destination — like a relay race. For heavy stuff (files, voice, video), phones spin up a fast local Wi-Fi link automatically. And your phone can act as a tiny web server, so anyone nearby can open your pages in their browser.
+
+**The technical version:**
+- **Mesh layer** — Custom BLE mesh protocol with packet framing, multi-hop routing, and a dispatcher (`protocol/`, `BleMeshManager`, `MeshRouter`)
+- **Transport upgrade** — Automatic handoff to high-throughput Wi-Fi socket/hotspot links for files and media (`WifiSocketManager`, `HotspotManager`, `HighSpeedFileTransferManager`)
+- **Local web server** — Embedded Ktor (Netty) server hosting SPAs and a developer portal; QR-code onboarding for browser guests (`WebServerManager`, `WebPortalTemplate`)
+- **Real-time sync** — State synchronization for physics, canvas, and games across mesh nodes
+- **Crypto** — Diffie-Hellman-derived keys for encrypted mesh traffic (`CryptoManager`)
+- **Persistence** — Room database for chat history, DataStore for preferences
+- **Background operation** — Foreground service keeps the mesh alive with minimal battery drain
+
+---
+
+## 🛠️ Tech stack
+
+| Layer | Technology |
+|---|---|
+| Language | Kotlin 2.2 |
+| UI | Jetpack Compose (Material 3), Navigation Compose |
+| Mesh & networking | Custom BLE mesh protocol, Wi-Fi Direct/sockets, Ktor server (Netty) |
+| Storage | Room, DataStore |
+| Media | CameraX, Coil |
+| Utilities | ZXing (QR), Play Services Location, Coroutines |
+| Build | Gradle (Kotlin DSL), GitHub Actions CI |
+
+---
+
+## 🚀 Getting started
+
+**Requirements:** Android Studio (latest), JDK 21, an Android device or emulator (API 24+).
+
+```bash
+git clone https://github.com/karanraj-ux/AetherWeb.git
+cd AetherWeb
 ```
-┌───────────────────────────────────────┐       ┌───────────────────────────────────────┐
-│        📡 BLE MESH NETWORKING         │       │     ⚛️ LIVE PHYSICS SIMULATION        │
-│                                       │   +   │                                       │
-│  Devices link through the air using   │       │  Simulate gravity, collisions, fluid  │
-│  silent radio waves. No cell towers,  │       │  dynamics, and forces in real time    │
-│  no internet cables, no routers.      │       │  on an interactive digital canvas.    │
-└───────────────────────────────────────┘       └───────────────────────────────────────┘
-                                    │
-                                    ▼
-       ┌─────────────────────────────────────────────────────────┐
-       │                🌌 THE AETHERWEB REALM                   │
-       │                                                         │
-       │  Experiment with physics together, host web pages       │
-       │  offline, and inspect code collaboratively in real time.│
-       └─────────────────────────────────────────────────────────┘
-```
+
+Then open the project in Android Studio — it will offer to generate the Gradle wrapper on first open — and hit **Run**. For a release build, CI handles signing via GitHub Actions (see `.github/workflows/android.yml`).
+
+> 💡 **Try it with a friend:** install the app on two phones, keep them nearby, and watch them discover each other — no internet needed.
 
 ---
 
-## 🚀 Key Innovations & Superpowers
+## 🔒 Privacy
 
-### 1. ⚛️ Real-Time Interactive Physics Laboratory
-- **Touch-Responsive Dynamics:** Experience realistic gravity, bouncing collisions, spring tensions, friction, and fluid motions on an intuitive visual canvas.
-- **On-the-Fly Tweaking:** Adjust physical constants (mass, velocity, restitution, electromagnetic fields) live and immediately see how simulated objects react.
-- **Collaborative Simulation:** Because states synchronize across the mesh, multiple peers can manipulate and launch objects in the same shared simulated world simultaneously.
-
-### 2. 📡 Autonomous Bluetooth Low Energy (BLE) Mesh
-- **Whisper Mesh Hopping:** Data and simulation states hop automatically between nearby phones, extending the network range naturally as more people join.
-- **Ultra-Low Battery Drain:** Runs in the background with minimal power consumption, ideal for all-day outdoor research or emergency use.
-
-### 3. 🌐 The "Zero-Install" Web Portal
-- **Host Websites from Your Pocket:** Your phone acts as a local web server serving interactive Single Page Applications (SPAs), developer sandboxes, and documentation.
-- **Friends Need No App:** Anyone nearby on an iPhone, iPad, Android, or laptop can connect to your local broadcast and open your projects inside Safari, Chrome, or Firefox. No downloads, no app stores, and no logins.
-
-### 4. 🤝 Decentralized Peer Collaboration
-- **Shared Interactive Canvas:** Sketch diagrams, map out architectural schematics, or illustrate scientific concepts in real time.
-- **Rapid File & Media Transfer:** Share project files, maps, audio notes, and assets phone-to-phone at speeds up to 50 MB/s.
-- **Off-Grid Telemetry & SOS:** In remote backcountry, broadcast location pings and loud acoustic siren beacons across all connected nodes with one tap.
+- **Zero cloud** — messages, files, and simulations never leave the mesh
+- **No accounts** — no phone numbers, no emails, no logins
+- **No tracking** — no analytics, no cookies, no ads
+- **Your network, your rules** — works even when the internet doesn't
 
 ---
 
-## 🎯 Who is AetherWeb For?
-
-- 🎓 **Students & Educators:** Explore physics and web technologies anywhere—from outdoor nature trips to classrooms without dependable internet.
-- 💻 **Engineers & Creative Builders:** Prototype ideas, preview web projects, and test interactive mechanics on the go without network friction.
-- 🔬 **Field Researchers & Explorers:** Collect and visualize data collaboratively in remote environments where cloud infrastructure does not exist.
-- 🏕️ **Outdoor Adventurers & Responders:** Keep groups connected, share offline tactical maps, and coordinate rescue telemetry off the grid.
-
----
-
-## 🚀 Getting Started in 3 Steps
-
-1. **Launch AetherWeb:** Open the app on your Android device. It immediately boots the local engine and activates the BLE mesh radio.
-2. **Simulate & Create:** Interact with the real-time physics sandbox, drop objects, and test your ideas directly on screen.
-3. **Invite Nearby Peers:** Nearby AetherWeb nodes connect automatically. For friends without the app, show your screen's QR code—they scan it with their camera and join instantly through their web browser!
-
----
-
-## 🔒 100% Private, 100% Local
-
-- **Zero Cloud Dependence:** All simulations, messages, and files remain strictly between connected devices.
-- **No Accounts Required:** No phone numbers, no email addresses, and no tracking cookies.
-- **Sovereign Technology:** Your capacity to create, learn, and communicate is completely independent of telecom monopolies and internet infrastructure.
-
----
-
-*AetherWeb: Empowering human creation and connection—anywhere on Earth.*
+*AetherWeb: creation and connection — anywhere on Earth, internet or not.* 🌌
