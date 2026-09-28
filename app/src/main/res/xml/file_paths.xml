@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <files-path name="shared_files" path="shared_files/" />
+    <cache-path name="mesh_cache" path="mesh_cache/" />
+    <cache-path name="downloaded_files" path="downloaded_files/" />
+    <cache-path name="cache_files" path="." />
+</paths>

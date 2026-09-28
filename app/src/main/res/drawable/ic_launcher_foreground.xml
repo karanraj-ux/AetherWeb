@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="2.2"
+        android:scaleY="2.2"
+        android:translateX="27.6"
+        android:translateY="27.6">
+        
+        <!-- Lines connecting nodes -->
+        <path
+            android:strokeColor="#FFAB00"
+            android:strokeWidth="2.5"
+            android:pathData="M12,12 L7,17 M12,12 L17,17 M12,7 L12,12" />
+            
+        <!-- Center node -->
+        <path
+            android:fillColor="#FFAB00"
+            android:pathData="M12,10.5 A1.5,1.5 0 1,1 12,13.5 A1.5,1.5 0 1,1 12,10.5 Z" />
+
+        <!-- Nodes -->
+        <path
+            android:fillColor="#00E5FF"
+            android:pathData="M17,14c-1.66,0 -3,1.34 -3,3s1.34,3 3,3 3,-1.34 3,-3 -1.34,-3 -3,-3zM7,14c-1.66,0 -3,1.34 -3,3s1.34,3 3,3 3,-1.34 3,-3 -1.34,-3 -3,-3zM12,4c-1.66,0 -3,1.34 -3,3s1.34,3 3,3 3,-1.34 3,-3 -1.34,-3 -3,-3z" />
+            
+    </group>
+</vector>
