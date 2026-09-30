@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -298,6 +299,66 @@ fun ChatBubble(
                                     color = Color.Black,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                } else if (textWithoutUrl.startsWith("💬 [Reel Reply") || textWithoutUrl.startsWith("📱 [Shared Reel]")) {
+                    val isShare = textWithoutUrl.startsWith("📱 [Shared Reel]")
+                    val headerText = if (isShare) "Offline Reel Shared" else "Reel Comment Reply"
+                    
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFF131D24),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clickable { onOpenUrl("meshfeed://open") }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Min)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(4.dp)
+                                    .fillMaxHeight()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(Color(0xFFE1306C), Color(0xFFFD1D1D), Color(0xFFF77737))
+                                        )
+                                    )
+                            )
+                            Column(modifier = Modifier.padding(8.dp).weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.VideoLibrary,
+                                        contentDescription = null,
+                                        tint = Color(0xFFE1306C),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = headerText,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFE1306C)
+                                    )
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Text(
+                                        text = "View ▶",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF4FC3F7)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = textWithoutUrl,
+                                    color = Color(0xFFE9EDEF),
+                                    fontSize = 13.sp,
+                                    lineHeight = 17.sp
                                 )
                             }
                         }
