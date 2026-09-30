@@ -130,6 +130,17 @@ class MeshViewModel(application: Application) : AndroidViewModel(application) {
     val database = com.aetherweb.app.data.MeshChatDatabase.getDatabase(application)
     val repository = com.aetherweb.app.data.ChatRepository(database.chatDao(), database.callLogDao())
 
+    // Phase 3 ("walking away" test): outbox for messages sent while the mesh was
+    // empty. They are automatically re-broadcast when peers come back into range.
+    private data class PendingOutboxEntry(
+        val payloadJson: String,
+        val localMessageId: String,
+        val enqueuedAt: Long = System.currentTimeMillis()
+    )
+    private val pendingOutbox = mutableListOf<PendingOutboxEntry>()
+    private val outboxLock = Any()
+    private val OUTBOX_MAX_AGE_MS = 24 * 60 * 60 * 1000L
+
     val callLogs: StateFlow<List<com.aetherweb.app.data.CallLogEntity>> = repository.allCallLogs
         .stateIn(
             scope = viewModelScope,
@@ -138,6 +149,20 @@ class MeshViewModel(application: Application) : AndroidViewModel(application) {
         )
 
     init {
+        // Phase 3: watch for the mesh coming back after an outage — flush queued
+        // PENDING messages so nothing typed while "walking away" is ever lost.
+        viewModelScope.launch {
+            var hadPeers = false
+            MeshNetworkManager._uiState.collect { state ->
+                val hasPeers = state.knownUsers.isNotEmpty() || state.isConnected ||
+                        InternetRelayManager.relayState.value.isRelayConnected
+                if (hasPeers && !hadPeers) {
+                    flushPendingOutbox()
+                }
+                hadPeers = hasPeers
+            }
+        }
+
         // Load saved permanent username if exists
         val prefs = application.getSharedPreferences("user_profile_prefs", Context.MODE_PRIVATE)
         val isGhost = prefs.getBoolean("is_ghost_mode", false)
@@ -1093,11 +1118,49 @@ class MeshViewModel(application: Application) : AndroidViewModel(application) {
                            MeshNetworkManager._uiState.value.isConnected ||
                            InternetRelayManager.relayState.value.isRelayConnected
             val targetStatus = if (hasPeers) DeliveryStatus.DELIVERED else DeliveryStatus.SENT
+            if (targetStatus == DeliveryStatus.SENT) {
+                // Nobody in range — queue for automatic re-delivery when the mesh returns.
+                synchronized(outboxLock) {
+                    if (pendingOutbox.size < 100) {
+                        pendingOutbox.add(PendingOutboxEntry(chatPayload, newMessage.id))
+                    }
+                }
+            }
             MeshNetworkManager._uiState.update { current ->
                 val updatedMessages = current.messages.map { msg ->
                     if (msg.id == newMessage.id) msg.copy(deliveryStatus = targetStatus) else msg
                 }
                 current.copy(messages = updatedMessages)
+            }
+        }
+    }
+
+    /**
+     * Phase 3: re-broadcasts every message that was queued while the mesh was empty,
+     * then marks them DELIVERED. Entries older than 24h are dropped silently.
+     * Safe against duplicates: queued messages were sent with zero peers in range,
+     * so no device could have received the first attempt.
+     */
+    private fun flushPendingOutbox() {
+        val now = System.currentTimeMillis()
+        val toSend = synchronized(outboxLock) {
+            val fresh = pendingOutbox.filter { now - it.enqueuedAt < OUTBOX_MAX_AGE_MS }
+            pendingOutbox.clear()
+            fresh
+        }
+        if (toSend.isEmpty()) return
+        android.util.Log.i("MeshViewModel", "Mesh returned — re-delivering ${toSend.size} queued message(s)")
+        for (entry in toSend) {
+            try {
+                MeshNetworkManager.meshRouter.routeLocalMessage(entry.payloadJson)
+                MeshNetworkManager._uiState.update { current ->
+                    val updated = current.messages.map { msg ->
+                        if (msg.id == entry.localMessageId) msg.copy(deliveryStatus = DeliveryStatus.DELIVERED) else msg
+                    }
+                    current.copy(messages = updated)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("MeshViewModel", "Outbox re-delivery failed for ${entry.localMessageId}", e)
             }
         }
     }
