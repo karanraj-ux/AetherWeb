@@ -90,6 +90,8 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // bitchat parity: stable mesh identity across restarts (idempotent)
+        com.aetherweb.app.MeshNetworkManager.initPersistentIdentity(this)
         CallManager.init(this)
         MeshMusicManager.init(this)
         enableEdgeToEdge()
