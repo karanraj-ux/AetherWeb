@@ -174,6 +174,15 @@ object MeshPacketCodec {
                     MeshPacket.PollClose(id = json.optString("id", ""))
                 }
 
+                MeshPacket.TYPE_FEED_REACTION -> {
+                    MeshPacket.FeedReaction(
+                        postId = json.optString("postId", ""),
+                        liked = json.optBoolean("liked", true),
+                        reactorName = json.optString("reactorName", ""),
+                        timestamp = json.optLong("timestamp", System.currentTimeMillis())
+                    )
+                }
+
                 MeshPacket.TYPE_RANDOMIZER -> {
                     MeshPacket.Randomizer(
                         id = json.optString("id", ""),
