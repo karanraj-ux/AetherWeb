@@ -118,6 +118,7 @@ object MeshNetworkManager {
 
         hotspotManager = HotspotManager(appContext)
         bleMeshManager = BleMeshManager(appContext)
+        bleMeshManager?.initAutoThrottle() // Phase 1: auto-throttle BLE when screen off / battery low
         wifiSocketManager = WifiSocketManager(appContext, localNodeId)
         
         initializeKeys()
@@ -685,6 +686,7 @@ class MeshForegroundService : Service() {
         MeshNetworkManager.webServerManager?.stopServer()
         MeshNetworkManager.bleMeshManager?.stopScanning()
         MeshNetworkManager.bleMeshManager?.stopAdvertising()
+        MeshNetworkManager.bleMeshManager?.releaseAutoThrottle()
         MeshNetworkManager.wifiSocketManager?.stop()
         super.onDestroy()
     }
