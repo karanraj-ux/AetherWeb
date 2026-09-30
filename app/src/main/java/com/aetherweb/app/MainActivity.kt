@@ -117,10 +117,48 @@ class MainActivity : ComponentActivity() {
                  it.permission == android.Manifest.permission.ACCESS_FINE_LOCATION) && it.status.isGranted
             }
 
+            // Phase 2 (zero-friction onboarding): a warm, plain-language rationale shown ONCE
+            // before the system permission prompts, so first-timers aren't ambushed.
+            val permPrefs = remember { this@MainActivity.getSharedPreferences("aether_perm_prefs", MODE_PRIVATE) }
+            var showPermRationale by remember { mutableStateOf(false) }
+
             LaunchedEffect(Unit) {
                 if (!canProceed) {
-                    permissionsState.launchMultiplePermissionRequest()
+                    if (permPrefs.getBoolean("perm_rationale_shown", false)) {
+                        permissionsState.launchMultiplePermissionRequest()
+                    } else {
+                        showPermRationale = true
+                    }
                 }
+            }
+
+            if (showPermRationale) {
+                AlertDialog(
+                    onDismissRequest = { },
+                    title = { Text("A quick heads-up ✋") },
+                    text = {
+                        Text(
+                            "AetherWeb talks phone-to-phone with no internet, so it needs its radios:\n\n" +
+                            "• Bluetooth — finds nearby phones and relays chat through the mesh\n" +
+                            "• Wi-Fi — carries voice/video calls, music sync and file beams\n" +
+                            "• Notifications — lets you know when messages arrive\n\n" +
+                            "No accounts, no servers, no tracking — the radios never leave your control."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            permPrefs.edit().putBoolean("perm_rationale_shown", true).apply()
+                            showPermRationale = false
+                            permissionsState.launchMultiplePermissionRequest()
+                        }) { Text("Got it, continue") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            permPrefs.edit().putBoolean("perm_rationale_shown", true).apply()
+                            showPermRationale = false
+                        }) { Text("Not now") }
+                    }
+                )
             }
             MyApplicationTheme {
                 // Removed blocking UI completely.
