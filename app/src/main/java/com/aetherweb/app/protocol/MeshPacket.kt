@@ -461,6 +461,21 @@ sealed class MeshPacket(val packetType: String) {
         }
     }
 
+    data class FeedReaction(
+        val postId: String,
+        val liked: Boolean, // true = like added, false = like removed
+        val reactorName: String = "",
+        val timestamp: Long = System.currentTimeMillis()
+    ) : MeshPacket(TYPE_FEED_REACTION) {
+        override fun toJson(): JSONObject = JSONObject().apply {
+            put("type", TYPE_FEED_REACTION)
+            put("postId", postId)
+            put("liked", liked)
+            if (reactorName.isNotBlank()) put("reactorName", reactorName)
+            put("timestamp", timestamp)
+        }
+    }
+
     companion object {
         const val TYPE_CHAT = "chat"
         const val TYPE_CANVAS = "canvas"
@@ -492,6 +507,7 @@ sealed class MeshPacket(val packetType: String) {
         const val TYPE_LIFELINE_RESPONSE = "lifeline_response"
         const val TYPE_CLUSTER_FORWARD = "cluster_forward"
         const val TYPE_DELIVERY_ACK = "delivery_ack"
+        const val TYPE_FEED_REACTION = "feed_reaction"
         const val TYPE_RAW = "raw"
     }
 }
