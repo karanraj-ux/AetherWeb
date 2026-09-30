@@ -33,12 +33,13 @@ class CryptoManager {
     @Synchronized
     fun loadOrCreatePersistentIdentity(context: Context): Boolean {
         val prefs = try {
+            val masterKey = androidx.security.crypto.MasterKey.Builder(context, androidx.security.crypto.MasterKey.DEFAULT_MASTER_KEY_ALIAS)
+                .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+                .build()
             androidx.security.crypto.EncryptedSharedPreferences.create(
-                "aether_mesh_identity",
-                androidx.security.crypto.MasterKey.Builder(context, androidx.security.crypto.MasterKey.DEFAULT_MASTER_KEY_ALIAS)
-                    .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
-                    .build(),
                 context,
+                "aether_mesh_identity",
+                masterKey,
                 androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
