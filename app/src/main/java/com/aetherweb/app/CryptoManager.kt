@@ -1,5 +1,6 @@
 package com.aetherweb.app
 
+import android.content.Context
 import android.util.Base64
 import java.security.KeyFactory
 import java.security.KeyPair
@@ -10,12 +11,67 @@ import java.security.Signature
 import java.security.spec.X509EncodedKeySpec
 
 class CryptoManager {
-    private val keyPair: KeyPair
+    private var keyPair: KeyPair = generateFreshKeyPair()
 
-    init {
+    private fun generateFreshKeyPair(): KeyPair {
         val keyGen = KeyPairGenerator.getInstance("EC")
         keyGen.initialize(256)
-        keyPair = keyGen.generateKeyPair()
+        return keyGen.generateKeyPair()
+    }
+
+    /**
+     * bitchat parity: stable identity across restarts. Loads the EC P-256 signing
+     * keypair from EncryptedSharedPreferences (AndroidKeyStore-backed), generating
+     * and storing it on first run. Without this, every restart makes you a
+     * stranger — dedup, rate-limiter and peer-table state reset.
+     *
+     * Falls back to plain SharedPreferences when the keystore is unavailable,
+     * and keeps the ephemeral keypair if everything fails (never crashes).
+     *
+     * @return true if a previously-stored identity was restored
+     */
+    @Synchronized
+    fun loadOrCreatePersistentIdentity(context: Context): Boolean {
+        val prefs = try {
+            androidx.security.crypto.EncryptedSharedPreferences.create(
+                "aether_mesh_identity",
+                androidx.security.crypto.MasterKey.Builder(context, androidx.security.crypto.MasterKey.DEFAULT_MASTER_KEY_ALIAS)
+                    .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+                    .build(),
+                context,
+                androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            android.util.Log.w("CryptoManager", "EncryptedSharedPreferences unavailable, using plain prefs", e)
+            context.getSharedPreferences("aether_mesh_identity_plain", Context.MODE_PRIVATE)
+        }
+        return try {
+            val privB64 = prefs.getString("ec_priv_pkcs8", null)
+            val pubB64 = prefs.getString("ec_pub_x509", null)
+            if (!privB64.isNullOrBlank() && !pubB64.isNullOrBlank()) {
+                val kf = KeyFactory.getInstance("EC")
+                val priv = kf.generatePrivate(
+                    java.security.spec.PKCS8EncodedKeySpec(Base64.decode(privB64, Base64.NO_WRAP))
+                )
+                val pub = kf.generatePublic(X509EncodedKeySpec(Base64.decode(pubB64, Base64.NO_WRAP)))
+                keyPair = KeyPair(pub, priv)
+                android.util.Log.i("CryptoManager", "Restored persistent mesh identity")
+                true
+            } else {
+                val fresh = generateFreshKeyPair()
+                prefs.edit()
+                    .putString("ec_priv_pkcs8", Base64.encodeToString(fresh.private.encoded, Base64.NO_WRAP))
+                    .putString("ec_pub_x509", Base64.encodeToString(fresh.public.encoded, Base64.NO_WRAP))
+                    .apply()
+                keyPair = fresh
+                android.util.Log.i("CryptoManager", "Generated new persistent mesh identity")
+                false
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("CryptoManager", "Persistent identity failed, keeping ephemeral keypair", e)
+            false
+        }
     }
 
     val publicKeyBase64: String
