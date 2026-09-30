@@ -1044,6 +1044,7 @@ class MeshViewModel(application: Application) : AndroidViewModel(application) {
         MeshNetworkManager._uiState.update { it.copy(
             messages = it.messages + newMessage
         ) }
+        AetherFeedManager.handleIncomingChatMessage(text, "Me")
 
         if (!isBurner && !state.isGhostMode) {
             viewModelScope.launch(Dispatchers.IO) {
