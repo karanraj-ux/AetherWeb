@@ -124,11 +124,40 @@ object AetherFeedManager {
     }
 
     fun toggleLike(postId: String) {
+        var didLike = false
         _posts.value = _posts.value.map { post ->
             if (post.id == postId) {
                 val newLiked = !post.isLiked
+                didLike = newLiked
                 val newCount = if (newLiked) post.likes + 1 else (post.likes - 1).coerceAtLeast(0)
                 post.copy(isLiked = newLiked, likes = newCount)
+            } else {
+                post
+            }
+        }
+        // Propagate the reaction across the mesh so every peer's feed updates live (<200ms on local radio).
+        try {
+            val me = com.aetherweb.app.MeshNetworkManager._uiState.value.localUserName
+            val reaction = com.aetherweb.app.protocol.MeshPacket.FeedReaction(
+                postId = postId,
+                liked = didLike,
+                reactorName = me
+            )
+            com.aetherweb.app.MeshNetworkManager.meshRouter.routePacket(reaction)
+        } catch (e: Exception) {
+            android.util.Log.w("AetherFeed", "Failed to broadcast like for $postId", e)
+        }
+    }
+
+    /**
+     * Applies a like/unlike received from a peer. Never rebroadcasts from here —
+     * the mesh flood (TTL + dedup) already carries each reaction to everyone exactly once.
+     */
+    fun applyRemoteReaction(postId: String, liked: Boolean) {
+        _posts.value = _posts.value.map { post ->
+            if (post.id == postId) {
+                val newCount = (post.likes + if (liked) 1 else -1).coerceAtLeast(0)
+                post.copy(likes = newCount)
             } else {
                 post
             }
