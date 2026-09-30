@@ -100,6 +100,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.size.Scale
 import com.aetherweb.app.AetherFeedManager
 import com.aetherweb.app.FeedComment
 import com.aetherweb.app.FeedPost
@@ -547,8 +549,15 @@ private fun ReelPageItem(
                 modifier = Modifier.fillMaxSize()
             )
         } else if (post.mediaType == "image" && post.isLocalDeviceMedia) {
+            // Phase 1 OOM safeguard: downsample huge camera photos (12MP+) to screen
+            // resolution BEFORE decoding, so swiping dozens of photos can't OOM.
             AsyncImage(
-                model = Uri.parse(post.mediaUri),
+                model = ImageRequest.Builder(context)
+                    .data(Uri.parse(post.mediaUri))
+                    .size(1080, 1920)
+                    .scale(Scale.FILL)
+                    .crossfade(true)
+                    .build(),
                 contentDescription = post.caption,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
