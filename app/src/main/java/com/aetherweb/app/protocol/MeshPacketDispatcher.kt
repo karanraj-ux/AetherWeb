@@ -399,6 +399,15 @@ object MeshPacketDispatcher {
                 return true
             }
 
+            is MeshPacket.FeedReaction -> {
+                // Live feed reaction propagation: a peer liked/unliked a reel — apply it locally.
+                // MeshRouter dedup guarantees we process each reaction exactly once.
+                if (packet.postId.isNotBlank()) {
+                    com.aetherweb.app.AetherFeedManager.applyRemoteReaction(packet.postId, packet.liked)
+                }
+                return true
+            }
+
             is MeshPacket.SysHandshake -> {
                 val sysMsg = ChatMessage(
                     senderName = "System",
