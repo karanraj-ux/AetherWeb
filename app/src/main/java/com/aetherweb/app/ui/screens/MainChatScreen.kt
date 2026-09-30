@@ -69,6 +69,9 @@ fun MainChatScreen(
     var showCallPickerSheet by remember { mutableStateOf(false) }
     var callPickerIsVideo by remember { mutableStateOf(false) }
     var showNoPeersDialog by remember { mutableStateOf(false) }
+    var showCallOptionDialog by remember { mutableStateOf(false) }
+    var showRoomPrivacyDialog by remember { mutableStateOf(false) }
+    var showSafetySosDialog by remember { mutableStateOf(false) }
 
     val cdnFilePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: android.net.Uri? ->
         if (uri != null) {
@@ -210,25 +213,27 @@ fun MainChatScreen(
                             }
                         } else {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable { showProfileDialog = true }
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .size(40.dp)
                                         .clip(CircleShape)
-                                        .background(WhatsAppOutgoingDark),
+                                        .background(WhatsAppOutgoingDark)
+                                        .clickable { showProfileDialog = true },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        Icons.Default.Group,
-                                        contentDescription = null,
+                                        Icons.Default.AccountCircle,
+                                        contentDescription = "Profile",
                                         tint = Color.White,
-                                        modifier = Modifier.size(22.dp)
+                                        modifier = Modifier.size(24.dp)
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(10.dp))
-                                Column {
+                                Column(
+                                    modifier = Modifier.clickable { showRosterDialog = true }
+                                ) {
                                     Text(
                                         text = "MeshChat Room",
                                         style = MaterialTheme.typography.titleMedium,
@@ -239,7 +244,7 @@ fun MainChatScreen(
                                     )
                                     Text(
                                         text = buildString {
-                                            append("${uiState.connectedNodes.size + 1} online • ${uiState.localUserName} (${uiState.localUsernameId})")
+                                            append("${uiState.connectedNodes.size + 1} online • ${uiState.localUserName}")
                                             if (uiState.isGhostMode) append(" • 👻 Ghost")
                                         },
                                         style = MaterialTheme.typography.labelSmall,
@@ -262,70 +267,42 @@ fun MainChatScreen(
                         containerColor = if (uiState.isEmergencyMode) Color(0xFFB71C1C) else Color(0xFF1F2C34)
                     ),
                     actions = {
-                        // Quick SOS Beacon button in action bar
-                        IconButton(onClick = { showSOSConfirmDialog = true }) {
-                            Icon(
-                                Icons.Default.Warning,
-                                contentDescription = "Emergency SOS Beacon",
-                                tint = if (uiState.isEmergencyMode) Color.Yellow else Color(0xFFFF5252)
-                            )
-                        }
-                        // Dedicated Video Call Button
-                        IconButton(
-                            onClick = {
-                                if (uiState.connectedNodes.isEmpty()) {
-                                    showNoPeersDialog = true
-                                } else if (uiState.connectedNodes.size == 1) {
-                                    val peer = uiState.connectedNodes.first()
-                                    val peerName = uiState.knownUsers[peer.id] ?: peer.name
-                                    val peerIp = if (uiState.isHotspotActive) "192.168.49.1" else ""
-                                    CallManager.initiateCall(peer.id, peerName, peerIp) { payload ->
-                                        com.aetherweb.app.MeshNetworkManager.meshRouter.routeLocalMessage(payload)
-                                        com.aetherweb.app.MeshNetworkManager.webServerManager?.broadcastMessage(payload, com.aetherweb.app.MeshNetworkManager.localNodeId)
-                                    }
-                                } else {
-                                    callPickerIsVideo = true
-                                    showCallPickerSheet = true
-                                }
-                            },
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(Icons.Default.Videocam, contentDescription = "Video Call", tint = Color(0xFFE9EDEF), modifier = Modifier.size(22.dp))
-                        }
-                        // Dedicated Voice Call Button
-                        IconButton(
-                            onClick = {
-                                if (uiState.connectedNodes.isEmpty()) {
-                                    showNoPeersDialog = true
-                                } else if (uiState.connectedNodes.size == 1) {
-                                    val peer = uiState.connectedNodes.first()
-                                    val peerName = uiState.knownUsers[peer.id] ?: peer.name
-                                    val peerIp = if (uiState.isHotspotActive) "192.168.49.1" else ""
-                                    CallManager.initiateCall(peer.id, peerName, peerIp) { payload ->
-                                        com.aetherweb.app.MeshNetworkManager.meshRouter.routeLocalMessage(payload)
-                                        com.aetherweb.app.MeshNetworkManager.webServerManager?.broadcastMessage(payload, com.aetherweb.app.MeshNetworkManager.localNodeId)
-                                    }
-                                } else {
-                                    callPickerIsVideo = false
-                                    showCallPickerSheet = true
-                                }
-                            },
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(Icons.Default.Call, contentDescription = "Voice Call", tint = Color(0xFFE9EDEF), modifier = Modifier.size(20.dp))
-                        }
-                        // WhatsApp Style 2 QR Codes Button (Wi-Fi & WebChat)
-                        IconButton(
-                            onClick = {
-                                showHotspotDialog = true
+                        // Alert indicator when emergency beacon is active
+                        if (uiState.isEmergencyMode) {
+                            IconButton(onClick = { showSafetySosDialog = true }) {
+                                Icon(
+                                    Icons.Default.Warning,
+                                    contentDescription = "Active Emergency SOS",
+                                    tint = Color.Yellow
+                                )
                             }
+                        }
+                        // Consolidated Mesh Call Button (Voice or Video selection)
+                        IconButton(
+                            onClick = {
+                                if (uiState.connectedNodes.isEmpty()) {
+                                    showNoPeersDialog = true
+                                } else {
+                                    showCallOptionDialog = true
+                                }
+                            },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(Icons.Default.Call, contentDescription = "Start Call", tint = Color(0xFFE9EDEF), modifier = Modifier.size(22.dp))
+                        }
+                        // Unified QR / Share Button
+                        IconButton(
+                            onClick = { showHotspotDialog = true },
+                            modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
                                 Icons.Default.QrCode2,
-                                contentDescription = "2 QR Codes (WebChat & Wi-Fi)",
-                                tint = if (uiState.isHotspotActive) WhatsAppGreen else Color(0xFFE9EDEF)
+                                contentDescription = "Invite & Share",
+                                tint = if (uiState.isHotspotActive) WhatsAppGreen else Color(0xFFE9EDEF),
+                                modifier = Modifier.size(22.dp)
                             )
                         }
+                        // Standardized 4-Item Menu
                         IconButton(onClick = { showTopMenu = true }) {
                             Icon(Icons.Default.MoreVert, "More Options", tint = Color(0xFFE9EDEF))
                         }
@@ -336,64 +313,11 @@ fun MainChatScreen(
                             DropdownMenuItem(
                                 text = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Devices, contentDescription = null, tint = WhatsAppGreen, modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Column {
-                                            Text("Cross-Platform Utilities", fontWeight = FontWeight.SemiBold)
-                                            Text("Shared Clipboard • CDN Drop • Speed Test • Backup", style = MaterialTheme.typography.labelSmall, color = WhatsAppSubtleText)
-                                        }
-                                    }
-                                },
-                                onClick = {
-                                    showTopMenu = false
-                                    showCrossPlatformHubDialog = true
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Tune, contentDescription = null, tint = WhatsAppGreen, modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Column {
-                                            Text("Optimization & Battery", fontWeight = FontWeight.SemiBold)
-                                            Text("Adaptive Duty Cycles • 100MB Cap • 2G/Sat Mode", style = MaterialTheme.typography.labelSmall, color = WhatsAppSubtleText)
-                                        }
-                                    }
-                                },
-                                onClick = {
-                                    showTopMenu = false
-                                    selectedHubTab = 4
-                                    showCrossPlatformHubDialog = true
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.AccountCircle, contentDescription = null, tint = WhatsAppGreen, modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Column {
-                                            Text("Profile & Username", fontWeight = FontWeight.SemiBold)
-                                            Text(uiState.localUsernameId, style = MaterialTheme.typography.labelSmall, color = WhatsAppSubtleText)
-                                        }
-                                    }
-                                },
-                                onClick = { 
-                                    showTopMenu = false
-                                    profileNameInput = uiState.localUserName
-                                    profileUsernameIdInput = uiState.localUsernameId
-                                    profileIsPermanent = uiState.isUsernamePermanent
-                                    profileIsGhost = uiState.isGhostMode
-                                    showProfileDialog = true 
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(Icons.Default.QrCode2, contentDescription = null, tint = WhatsAppGreen, modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Spacer(modifier = Modifier.width(10.dp))
                                         Column {
-                                            Text("2 QR Codes (Wi-Fi & WebChat)", fontWeight = FontWeight.SemiBold)
-                                            Text(if (uiState.isHotspotActive) "Hotspot Running • 2 QRs Active" else "View 2 QRs • Mesh & WebChat", style = MaterialTheme.typography.labelSmall, color = WhatsAppSubtleText)
+                                            Text("Invite & Connect", fontWeight = FontWeight.SemiBold)
+                                            Text("QR Codes, WebChat & Share APK", style = MaterialTheme.typography.labelSmall, color = WhatsAppSubtleText)
                                         }
                                     }
                                 },
@@ -405,81 +329,50 @@ fun MainChatScreen(
                             DropdownMenuItem(
                                 text = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.People, contentDescription = null, tint = Color(0xFF53BDEB), modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Room Roster & Members")
-                                    }
-                                },
-                                onClick = {
-                                    showTopMenu = false
-                                    showRosterDialog = true
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(if (uiState.isScanning) Icons.Default.BluetoothSearching else Icons.Default.Bluetooth, contentDescription = null, tint = WhatsAppGreen, modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(if (uiState.isScanning) "BLE Mesh Scanning (On)" else "BLE Mesh Scanning (Off)")
-                                    }
-                                },
-                                onClick = {
-                                    showTopMenu = false
-                                    viewModel.toggleScanning()
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Sensors, contentDescription = null, tint = if (uiState.autoJoinBeaconEnabled) Color(0xFF25D366) else Color.Gray, modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Icon(Icons.Default.Security, contentDescription = null, tint = WhatsAppGreen, modifier = Modifier.size(20.dp))
+                                        Spacer(modifier = Modifier.width(10.dp))
                                         Column {
-                                            Text("BLE Pulse Auto-Join", fontWeight = FontWeight.SemiBold)
-                                            Text(
-                                                if (uiState.autoJoinBeaconEnabled) "Auto-join mesh rooms (Enabled)" else "Disabled (Manual connect)",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = Color(0xFF8696A0)
-                                            )
+                                            Text("Room & Privacy", fontWeight = FontWeight.SemiBold)
+                                            Text("Burner Mode, Clear History, Leave", style = MaterialTheme.typography.labelSmall, color = WhatsAppSubtleText)
                                         }
                                     }
                                 },
-                                onClick = { 
+                                onClick = {
                                     showTopMenu = false
-                                    viewModel.toggleAutoJoinBeacon()
+                                    showRoomPrivacyDialog = true
                                 }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(if (uiState.isEmergencyMode) "Active SOS Beacon (Cancel)" else "Broadcast SOS Beacon 🚨", color = Color(0xFFFF5252), fontWeight = FontWeight.Bold) },
-                                onClick = { showTopMenu = false; showSOSConfirmDialog = true }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Show Diagnostics") },
-                                onClick = { showTopMenu = false; showDiagnosticsDialog = true }
-                            )
-
-                            DropdownMenuItem(
-                                text = { Text("Start Burner Room 🔥", color = MaterialTheme.colorScheme.error) },
-                                onClick = { showTopMenu = false; viewModel.startBurnerRoom(300) }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Clear Chat") },
-                                onClick = { showTopMenu = false; viewModel.clearChat() }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Disconnect & Reset") },
-                                onClick = { showTopMenu = false; viewModel.disconnectAndCleanup() }
                             )
                             DropdownMenuItem(
                                 text = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.DeleteForever, contentDescription = null, tint = Color(0xFFEA4335), modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Emergency Panic Wipe", color = Color(0xFFEA4335), fontWeight = FontWeight.Bold)
+                                        Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFF5252), modifier = Modifier.size(20.dp))
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text("Safety & SOS", fontWeight = FontWeight.SemiBold, color = Color(0xFFFF5252))
+                                            Text(if (uiState.isEmergencyMode) "Active SOS Beacon (Tap to manage)" else "Emergency Beacon & Panic Wipe", style = MaterialTheme.typography.labelSmall, color = WhatsAppSubtleText)
+                                        }
                                     }
                                 },
                                 onClick = {
                                     showTopMenu = false
-                                    showPanicWipeConfirmDialog = true
+                                    showSafetySosDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Tune, contentDescription = null, tint = WhatsAppGreen, modifier = Modifier.size(20.dp))
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text("Tools & Storage", fontWeight = FontWeight.SemiBold)
+                                            Text("Clipboard, 100MB Cache, Battery", style = MaterialTheme.typography.labelSmall, color = WhatsAppSubtleText)
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    showTopMenu = false
+                                    selectedHubTab = 1
+                                    showCrossPlatformHubDialog = true
                                 }
                             )
                         }
@@ -500,10 +393,10 @@ fun MainChatScreen(
                         label = { Text("Chats") }
                     )
                     NavigationBarItem(
-                        selected = currentTab == "Music",
-                        onClick = { currentTab = "Music" },
-                        icon = { Icon(Icons.Default.Audiotrack, "Music") },
-                        label = { Text("Music") }
+                        selected = currentTab == "Media" || currentTab == "Music",
+                        onClick = { currentTab = "Media" },
+                        icon = { Icon(Icons.Default.VideoLibrary, "Feed & Media") },
+                        label = { Text("Feed") }
                     )
                     NavigationBarItem(
                         selected = currentTab == "Calls",
@@ -594,10 +487,15 @@ fun MainChatScreen(
                 // Tab Views
                 when (currentTab) {
                     "Chat" -> {
-                        ChatTab(uiState, viewModel, onUserClick = { selectedUser = it })
+                        ChatTab(
+                            uiState = uiState,
+                            viewModel = viewModel,
+                            onUserClick = { selectedUser = it },
+                            onNavigateToFeed = { currentTab = "Media" }
+                        )
                     }
-                    "Music" -> {
-                        MusicTabScreen()
+                    "Music", "Media" -> {
+                        MediaFeedScreen(viewModel = viewModel)
                     }
                     "Calls" -> {
                         CallsTabScreen(
@@ -1153,6 +1051,263 @@ fun MainChatScreen(
             )
         }
 
+        // Consolidated Call Chooser Dialog (Voice vs Video)
+        if (showCallOptionDialog) {
+            AlertDialog(
+                onDismissRequest = { showCallOptionDialog = false },
+                title = { Text("Start Mesh Call", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Select call mode with connected mesh peers:", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.height(4.dp))
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showCallOptionDialog = false
+                                    if (uiState.connectedNodes.size == 1) {
+                                        val peer = uiState.connectedNodes.first()
+                                        val peerName = uiState.knownUsers[peer.id] ?: peer.name
+                                        val peerIp = if (uiState.isHotspotActive) "192.168.49.1" else ""
+                                        CallManager.initiateCall(peer.id, peerName, peerIp) { payload ->
+                                            com.aetherweb.app.MeshNetworkManager.meshRouter.routeLocalMessage(payload)
+                                            com.aetherweb.app.MeshNetworkManager.webServerManager?.broadcastMessage(payload, com.aetherweb.app.MeshNetworkManager.localNodeId)
+                                        }
+                                    } else {
+                                        callPickerIsVideo = false
+                                        showCallPickerSheet = true
+                                    }
+                                },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(WhatsAppGreen.copy(alpha = 0.2f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Call, contentDescription = null, tint = WhatsAppGreen)
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text("Voice Call", fontWeight = FontWeight.Bold)
+                                    Text("Low-bandwidth encrypted Opus mesh audio", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                            }
+                        }
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showCallOptionDialog = false
+                                    if (uiState.connectedNodes.size == 1) {
+                                        val peer = uiState.connectedNodes.first()
+                                        val peerName = uiState.knownUsers[peer.id] ?: peer.name
+                                        val peerIp = if (uiState.isHotspotActive) "192.168.49.1" else ""
+                                        CallManager.initiateCall(peer.id, peerName, peerIp) { payload ->
+                                            com.aetherweb.app.MeshNetworkManager.meshRouter.routeLocalMessage(payload)
+                                            com.aetherweb.app.MeshNetworkManager.webServerManager?.broadcastMessage(payload, com.aetherweb.app.MeshNetworkManager.localNodeId)
+                                        }
+                                    } else {
+                                        callPickerIsVideo = true
+                                        showCallPickerSheet = true
+                                    }
+                                },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(Color(0xFF53BDEB).copy(alpha = 0.2f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Videocam, contentDescription = null, tint = Color(0xFF53BDEB))
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text("Video Call", fontWeight = FontWeight.Bold)
+                                    Text("P2P high-definition mesh video stream", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showCallOptionDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        // Room & Privacy Dialog (Burner Room, Clear History, Disconnect)
+        if (showRoomPrivacyDialog) {
+            AlertDialog(
+                onDismissRequest = { showRoomPrivacyDialog = false },
+                title = { Text("Room & Privacy Options", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showRoomPrivacyDialog = false
+                                    viewModel.startBurnerRoom(300)
+                                },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.LocalFireDepartment, contentDescription = null, tint = Color(0xFFFF9800))
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text("Start Burner Room 🔥", fontWeight = FontWeight.Bold)
+                                    Text("Self-destructs all messages after 5 minutes", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                            }
+                        }
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showRoomPrivacyDialog = false
+                                    viewModel.clearChat()
+                                },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = Color(0xFFE9EDEF))
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text("Clear Chat History", fontWeight = FontWeight.Bold)
+                                    Text("Remove all local messages from screen", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                            }
+                        }
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showRoomPrivacyDialog = false
+                                    viewModel.disconnectAndCleanup()
+                                },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.ExitToApp, contentDescription = null, tint = Color(0xFFEA4335))
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text("Leave Room & Reset", fontWeight = FontWeight.Bold, color = Color(0xFFEA4335))
+                                    Text("Disconnect from current mesh network", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showRoomPrivacyDialog = false }) {
+                        Text("Close")
+                    }
+                }
+            )
+        }
+
+        // Safety & SOS Dialog
+        if (showSafetySosDialog) {
+            AlertDialog(
+                onDismissRequest = { showSafetySosDialog = false },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Security, contentDescription = null, tint = Color(0xFFFF5252))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Safety & Emergency SOS", fontWeight = FontWeight.Bold)
+                    }
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showSafetySosDialog = false
+                                    showSOSConfirmDialog = true
+                                },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (uiState.isEmergencyMode) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFF5252))
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        if (uiState.isEmergencyMode) "Cancel Active SOS Beacon 🚨" else "Broadcast SOS Beacon 🚨",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFFF5252)
+                                    )
+                                    Text("Sends emergency GPS beacon across all mesh hops", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                            }
+                        }
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.toggleEmergencySiren(context)
+                                },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (uiState.isEmergencySirenActive) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = if (uiState.isEmergencySirenActive) Color.Red else Color.Gray)
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        if (uiState.isEmergencySirenActive) "Stop Rescue Siren ⏹️" else "Start Rescue Siren 📢",
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (uiState.isEmergencySirenActive) Color.Red else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text("Plays max-volume audio distress tone for search & rescue", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                            }
+                        }
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showSafetySosDialog = false
+                                    showPanicWipeConfirmDialog = true
+                                },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f))
+                        ) {
+                            Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.DeleteForever, contentDescription = null, tint = Color(0xFFEA4335))
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text("Emergency Panic Wipe 🗑️", fontWeight = FontWeight.Bold, color = Color(0xFFEA4335))
+                                    Text("Zero-trace instant wipe of all keys and messages", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showSafetySosDialog = false }) {
+                        Text("Close")
+                    }
+                }
+            )
+        }
+
         // Contact Action Dialog when tapping a user header on any message
         if (selectedUser != null) {
             val userMsg = selectedUser!!
@@ -1265,12 +1420,18 @@ fun MainChatScreen(
                     dismissOnClickOutside = false
                 )
             ) {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .navigationBarsPadding(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
-                            .padding(16.dp),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         // Header with navigation & Hotspot state
@@ -1701,6 +1862,8 @@ fun MainChatScreen(
                                 }
                             }
                         }
+
+                        Spacer(Modifier.height(56.dp))
                     }
                 }
             }
@@ -1720,12 +1883,18 @@ fun MainChatScreen(
                     dismissOnClickOutside = false
                 )
             ) {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .navigationBarsPadding(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
-                            .padding(16.dp),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         // Header
@@ -1758,42 +1927,35 @@ fun MainChatScreen(
 
                         Spacer(Modifier.height(12.dp))
 
-                        // 5 Hub Tabs
-                        ScrollableTabRow(
-                            selectedTabIndex = selectedHubTab,
-                            edgePadding = 8.dp,
+                        // Consolidated 4 Hub Tabs (Fits without horizontal scrolling)
+                        TabRow(
+                            selectedTabIndex = selectedHubTab.coerceIn(0, 3),
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         ) {
                             Tab(
                                 selected = selectedHubTab == 0,
                                 onClick = { selectedHubTab = 0 },
-                                text = { Text("Clipboard", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                                text = { Text("Clipboard", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                                 icon = { Icon(Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(18.dp)) }
                             )
                             Tab(
                                 selected = selectedHubTab == 1,
                                 onClick = { selectedHubTab = 1 },
-                                text = { Text("CDN Files", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                                text = { Text("CDN Files", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                                 icon = { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(18.dp)) }
                             )
                             Tab(
                                 selected = selectedHubTab == 2,
                                 onClick = { selectedHubTab = 2 },
-                                text = { Text("Speed Test", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                                icon = { Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                text = { Text("Optimizer", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                                icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) }
                             )
                             Tab(
                                 selected = selectedHubTab == 3,
                                 onClick = { selectedHubTab = 3 },
-                                text = { Text("Backup/SOS", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                                text = { Text("Backup/SOS", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                                 icon = { Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                            )
-                            Tab(
-                                selected = selectedHubTab == 4,
-                                onClick = { selectedHubTab = 4 },
-                                text = { Text("Optimizer", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                                icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) }
                             )
                         }
 
@@ -2040,167 +2202,7 @@ fun MainChatScreen(
                                 }
                             }
                             2 -> {
-                                // --- TAB 2: SPEED & LATENCY BENCHMARK ---
-                                Text(
-                                    "⚡ Mesh Speed & Latency Test",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = WhatsAppGreen
-                                )
-                                Text(
-                                    "Test offline link latency, socket responsiveness, and Wi-Fi throughput.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                                )
-
-                                Spacer(Modifier.height(14.dp))
-
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                                ) {
-                                    Column(modifier = Modifier.padding(14.dp)) {
-                                        Text("Active Link Status", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                                        Spacer(Modifier.height(6.dp))
-                                        Text("• Mode: " + if (uiState.isHotspotActive) "🟢 Wi-Fi AP Host (Room Active)" else if (uiState.isWifiConnected) "🔵 Wi-Fi Client Connected" else "⚪ BLE Mesh Beacon", style = MaterialTheme.typography.bodySmall)
-                                        Text("• Local IP: " + if (uiState.hotspotIp.isNotBlank()) uiState.hotspotIp else com.aetherweb.app.NetworkUtils.getLocalIpAddress(), style = MaterialTheme.typography.bodySmall)
-                                        Text("• Web Server Port: 8080 (HTTP & WebSockets)", style = MaterialTheme.typography.bodySmall)
-                                        Text("• Mesh Socket Port: 8888 (P2P Packets)", style = MaterialTheme.typography.bodySmall)
-                                        Text("• Connected Mesh Nodes: ${uiState.connectedNodes.size}", style = MaterialTheme.typography.bodySmall)
-                                        val bridgeState = com.aetherweb.app.WifiClusterBridgeManager.bridgeState.value
-                                        Text("• Wi-Fi Multi-Cluster: ${if (bridgeState.isBridgeRelay) "🌉 Active Bridge Relay (${bridgeState.activeClustersCount} Clusters)" else "🌐 Cluster (${bridgeState.currentClusterId})"}", style = MaterialTheme.typography.bodySmall, color = if (bridgeState.isBridgeRelay) WhatsAppGreen else MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                }
-
-                                Spacer(Modifier.height(16.dp))
-
-                                Button(
-                                    onClick = { viewModel.runMeshSpeedTest() },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Run Latency & Throughput Benchmark")
-                                }
-
-                                if (uiState.meshSpeedResult != null) {
-                                    Spacer(Modifier.height(14.dp))
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                                    ) {
-                                        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Icon(Icons.Default.NetworkCheck, contentDescription = null, tint = WhatsAppGreen, modifier = Modifier.size(36.dp))
-                                            Spacer(Modifier.height(8.dp))
-                                            Text(
-                                                uiState.meshSpeedResult!!,
-                                                fontWeight = FontWeight.Bold,
-                                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            3 -> {
-                                // --- TAB 3: BACKUP & EMERGENCY SOS RESCUE ---
-                                Text(
-                                    "💾 Backup & Survival Utilities",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = WhatsAppGreen
-                                )
-                                Text(
-                                    "Export all offline chat history or activate life-safety distress alarms in disaster areas.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                                )
-
-                                Spacer(Modifier.height(14.dp))
-
-                                // Backup Card
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                                ) {
-                                    Column(modifier = Modifier.padding(14.dp)) {
-                                        Text("Offline Chat Backup", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                                        Spacer(Modifier.height(4.dp))
-                                        Text("Export or restore messages and timestamps to standard JSON.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                                        Spacer(Modifier.height(10.dp))
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Button(
-                                                onClick = { viewModel.exportChatBackup(context) },
-                                                modifier = Modifier.weight(1f)
-                                            ) {
-                                                Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                Spacer(Modifier.width(4.dp))
-                                                Text("Export JSON")
-                                            }
-                                            OutlinedButton(
-                                                onClick = { showImportBackupDialog = true },
-                                                modifier = Modifier.weight(1f)
-                                            ) {
-                                                Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                Spacer(Modifier.width(4.dp))
-                                                Text("Import Backup")
-                                            }
-                                        }
-                                    }
-                                }
-
-                                Spacer(Modifier.height(16.dp))
-
-                                // Emergency Siren Card
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (uiState.isEmergencySirenActive) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                ) {
-                                    Column(modifier = Modifier.padding(14.dp)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                Icons.Default.NotificationsActive,
-                                                contentDescription = null,
-                                                tint = if (uiState.isEmergencySirenActive) Color.Red else Color.Gray
-                                            )
-                                            Spacer(Modifier.width(8.dp))
-                                            Text(
-                                                "🚨 Emergency Rescue Siren",
-                                                fontWeight = FontWeight.Bold,
-                                                style = MaterialTheme.typography.titleSmall,
-                                                color = if (uiState.isEmergencySirenActive) Color.Red else MaterialTheme.colorScheme.onSurface
-                                            )
-                                        }
-                                        Spacer(Modifier.height(6.dp))
-                                        Text(
-                                            "Emits a high-volume alarm tone to alert nearby rescue personnel and signal your location in disaster/collapsed structure situations.",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(Modifier.height(12.dp))
-                                        Button(
-                                            onClick = { viewModel.toggleEmergencySiren(context) },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = if (uiState.isEmergencySirenActive) Color.Red else Color(0xFFD32F2F)
-                                            ),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text(
-                                                if (uiState.isEmergencySirenActive) "⏹️ STOP EMERGENCY SIREN" else "🚨 START LOUD RESCUE SIREN",
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            4 -> {
-                                // --- TAB 4: PHASE 5 OPTIMIZATION (BATTERY, STORAGE, 2G/SATELLITE) ---
+                                // --- TAB 2: SYSTEM OPTIMIZATION, STORAGE & BENCHMARK ---
                                 Text(
                                     "⚡ System & Network Optimization",
                                     style = MaterialTheme.typography.titleMedium,
@@ -2208,7 +2210,7 @@ fun MainChatScreen(
                                     color = WhatsAppGreen
                                 )
                                 Text(
-                                    "Adaptive battery duty cycles, automated 100MB storage pruner, and packet compression for weak 2G/satellite links.",
+                                    "Adaptive battery duty cycles, automated 100MB storage pruner, packet compression, and speed benchmarks.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -2217,65 +2219,49 @@ fun MainChatScreen(
 
                                 Spacer(Modifier.height(14.dp))
 
-                                // CARD 1: BATTERY CONSUMPTION & DUTY CYCLES
+                                // CARD 1: ADAPTIVE BATTERY SAVER (Streamlined, zero jargon!)
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                                 ) {
                                     Column(modifier = Modifier.padding(14.dp)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Default.BatteryChargingFull, contentDescription = null, tint = WhatsAppGreen)
-                                            Spacer(Modifier.width(8.dp))
-                                            Column {
-                                                Text("Battery Consumption & Duty Cycles", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                                                Text("Current: ${uiState.bleDutyCycleLabel}", style = MaterialTheme.typography.labelSmall, color = WhatsAppGreen)
+                                        val isEcoActive = uiState.bleDutyCycleLabel.contains("Saver") || uiState.bleDutyCycleLabel.contains("10%")
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.BatteryChargingFull, contentDescription = null, tint = WhatsAppGreen)
+                                                Spacer(Modifier.width(8.dp))
+                                                Column {
+                                                    Text("Adaptive Battery Saver", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                                    Text(
+                                                        if (isEcoActive) "Eco Saver Active (~80% radio power saved)" else "Balanced Dynamic Mode",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = WhatsAppGreen
+                                                    )
+                                                }
                                             }
+
+                                            Switch(
+                                                checked = isEcoActive,
+                                                onCheckedChange = { checked ->
+                                                    if (checked) {
+                                                        viewModel.setBleDutyCycle(com.aetherweb.app.BleMeshManager.BleDutyCycle.ECO_SAVER)
+                                                    } else {
+                                                        viewModel.setBleDutyCycle(com.aetherweb.app.BleMeshManager.BleDutyCycle.BALANCED)
+                                                    }
+                                                }
+                                            )
                                         }
 
                                         Spacer(Modifier.height(8.dp))
                                         Text(
-                                            "BLE radio automatically adapts its sniffing duty cycle. When Wi-Fi mesh is connected, BLE drops to 10% duty cycle, saving ~80% radio power. WebSocket keep-alives dynamically pulse at 30s/45s intervals.",
+                                            "Automatically adapts BLE sniffing duty cycles and WebSocket sleep pulses to extend battery life up to 3x without dropping mesh messages.",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
-
-                                        Spacer(Modifier.height(12.dp))
-                                        Text("Select BLE Sniffing Duty Cycle:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                                        Spacer(Modifier.height(6.dp))
-
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                                            OutlinedButton(
-                                                onClick = { viewModel.setBleDutyCycle(com.aetherweb.app.BleMeshManager.BleDutyCycle.BALANCED) },
-                                                modifier = Modifier.weight(1f),
-                                                colors = if (uiState.bleDutyCycleLabel.contains("Balanced")) ButtonDefaults.outlinedButtonColors(containerColor = WhatsAppGreen.copy(alpha = 0.15f)) else ButtonDefaults.outlinedButtonColors()
-                                            ) {
-                                                Text("Balanced (25%)", fontSize = 11.sp)
-                                            }
-                                            OutlinedButton(
-                                                onClick = { viewModel.setBleDutyCycle(com.aetherweb.app.BleMeshManager.BleDutyCycle.ECO_SAVER) },
-                                                modifier = Modifier.weight(1f),
-                                                colors = if (uiState.bleDutyCycleLabel.contains("Battery Saver") || uiState.bleDutyCycleLabel.contains("10%")) ButtonDefaults.outlinedButtonColors(containerColor = WhatsAppGreen.copy(alpha = 0.15f)) else ButtonDefaults.outlinedButtonColors()
-                                            ) {
-                                                Text("Eco Saver (10%)", fontSize = 11.sp)
-                                            }
-                                        }
-                                        Spacer(Modifier.height(6.dp))
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                                            OutlinedButton(
-                                                onClick = { viewModel.setBleDutyCycle(com.aetherweb.app.BleMeshManager.BleDutyCycle.HIGH_ACTIVITY) },
-                                                modifier = Modifier.weight(1f),
-                                                colors = if (uiState.bleDutyCycleLabel.contains("High")) ButtonDefaults.outlinedButtonColors(containerColor = WhatsAppGreen.copy(alpha = 0.15f)) else ButtonDefaults.outlinedButtonColors()
-                                            ) {
-                                                Text("Discovery (66%)", fontSize = 11.sp)
-                                            }
-                                            OutlinedButton(
-                                                onClick = { viewModel.setBleDutyCycle(com.aetherweb.app.BleMeshManager.BleDutyCycle.CONTINUOUS) },
-                                                modifier = Modifier.weight(1f),
-                                                colors = if (uiState.bleDutyCycleLabel.contains("Continuous")) ButtonDefaults.outlinedButtonColors(containerColor = WhatsAppGreen.copy(alpha = 0.15f)) else ButtonDefaults.outlinedButtonColors()
-                                            ) {
-                                                Text("Continuous (100%)", fontSize = 11.sp)
-                                            }
-                                        }
                                     }
                                 }
 
@@ -2421,8 +2407,155 @@ fun MainChatScreen(
                                         )
                                     }
                                 }
+
+                                Spacer(Modifier.height(14.dp))
+
+                                // CARD 4: MESH SPEED & LATENCY BENCHMARK
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Text("Active Link Status", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                        Spacer(Modifier.height(6.dp))
+                                        Text("• Mode: " + if (uiState.isHotspotActive) "🟢 Wi-Fi AP Host (Room Active)" else if (uiState.isWifiConnected) "🔵 Wi-Fi Client Connected" else "⚪ BLE Mesh Beacon", style = MaterialTheme.typography.bodySmall)
+                                        Text("• Local IP: " + if (uiState.hotspotIp.isNotBlank()) uiState.hotspotIp else com.aetherweb.app.NetworkUtils.getLocalIpAddress(), style = MaterialTheme.typography.bodySmall)
+                                        Text("• Web Server Port: 8080 (HTTP & WebSockets)", style = MaterialTheme.typography.bodySmall)
+                                        Text("• Mesh Socket Port: 8888 (P2P Packets)", style = MaterialTheme.typography.bodySmall)
+                                        Text("• Connected Mesh Nodes: ${uiState.connectedNodes.size}", style = MaterialTheme.typography.bodySmall)
+                                        val bridgeState = com.aetherweb.app.WifiClusterBridgeManager.bridgeState.value
+                                        Text("• Wi-Fi Multi-Cluster: ${if (bridgeState.isBridgeRelay) "🌉 Active Bridge Relay (${bridgeState.activeClustersCount} Clusters)" else "🌐 Cluster (${bridgeState.currentClusterId})"}", style = MaterialTheme.typography.bodySmall, color = if (bridgeState.isBridgeRelay) WhatsAppGreen else MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+
+                                Spacer(Modifier.height(12.dp))
+
+                                Button(
+                                    onClick = { viewModel.runMeshSpeedTest() },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Run Latency & Throughput Benchmark")
+                                }
+
+                                if (uiState.meshSpeedResult != null) {
+                                    Spacer(Modifier.height(14.dp))
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Icon(Icons.Default.NetworkCheck, contentDescription = null, tint = WhatsAppGreen, modifier = Modifier.size(36.dp))
+                                            Spacer(Modifier.height(8.dp))
+                                            Text(
+                                                uiState.meshSpeedResult!!,
+                                                fontWeight = FontWeight.Bold,
+                                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            3 -> {
+                                // --- TAB 3: BACKUP & EMERGENCY SOS RESCUE ---
+                                Text(
+                                    "💾 Backup & Survival Utilities",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = WhatsAppGreen
+                                )
+                                Text(
+                                    "Export all offline chat history or activate life-safety distress alarms in disaster areas.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                )
+
+                                Spacer(Modifier.height(14.dp))
+
+                                // Backup Card
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Text("Offline Chat Backup", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                        Spacer(Modifier.height(4.dp))
+                                        Text("Export or restore messages and timestamps to standard JSON.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                        Spacer(Modifier.height(10.dp))
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Button(
+                                                onClick = { viewModel.exportChatBackup(context) },
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Spacer(Modifier.width(4.dp))
+                                                Text("Export JSON")
+                                            }
+                                            OutlinedButton(
+                                                onClick = { showImportBackupDialog = true },
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Spacer(Modifier.width(4.dp))
+                                                Text("Import Backup")
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(Modifier.height(16.dp))
+
+                                // Emergency Siren Card
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (uiState.isEmergencySirenActive) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                Icons.Default.NotificationsActive,
+                                                contentDescription = null,
+                                                tint = if (uiState.isEmergencySirenActive) Color.Red else Color.Gray
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(
+                                                "🚨 Emergency Rescue Siren",
+                                                fontWeight = FontWeight.Bold,
+                                                style = MaterialTheme.typography.titleSmall,
+                                                color = if (uiState.isEmergencySirenActive) Color.Red else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                        Spacer(Modifier.height(6.dp))
+                                        Text(
+                                            "Emits a high-volume alarm tone to alert nearby rescue personnel and signal your location in disaster/collapsed structure situations.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(Modifier.height(12.dp))
+                                        Button(
+                                            onClick = { viewModel.toggleEmergencySiren(context) },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (uiState.isEmergencySirenActive) Color.Red else Color(0xFFD32F2F)
+                                            ),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                if (uiState.isEmergencySirenActive) "⏹️ STOP EMERGENCY SIREN" else "🚨 START LOUD RESCUE SIREN",
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
+
+                        Spacer(Modifier.height(56.dp))
                     }
                 }
             }
@@ -2587,7 +2720,12 @@ fun MainChatScreen(
 }
 
 @Composable
-fun ChatTab(uiState: MeshState, viewModel: MeshViewModel, onUserClick: (ChatMessage) -> Unit) {
+fun ChatTab(
+    uiState: MeshState,
+    viewModel: MeshViewModel,
+    onUserClick: (ChatMessage) -> Unit,
+    onNavigateToFeed: () -> Unit = {}
+) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var fullScreenImageUrl by remember { mutableStateOf<String?>(null) }
@@ -3018,6 +3156,8 @@ fun ChatTab(uiState: MeshState, viewModel: MeshViewModel, onUserClick: (ChatMess
                         if (url.startsWith("meshgame://")) {
                             val game = url.removePrefix("meshgame://")
                             viewModel.setSharedMedia(game, "", "game", 2)
+                        } else if (url == "meshfeed://open") {
+                            onNavigateToFeed()
                         } else {
                             val isImage = com.aetherweb.app.MeshStorageManager.isImageFile(url)
                             if (isImage) {
