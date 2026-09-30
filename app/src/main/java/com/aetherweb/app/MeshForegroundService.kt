@@ -30,8 +30,30 @@ object MeshNetworkManager {
     val uiState: StateFlow<MeshState> = _uiState.asStateFlow()
 
     val cryptoManager = CryptoManager()
-    val localNodeId = CryptoManager.computeNodeId(cryptoManager.publicKeyBase64)
+    var localNodeId = CryptoManager.computeNodeId(cryptoManager.publicKeyBase64)
+        private set
     val meshRouter = MeshRouter(localNodeId, cryptoManager)
+
+    private var identityInitialized = false
+
+    /**
+     * bitchat parity: stable identity across restarts. Swaps the ephemeral
+     * keypair for the persisted one and updates the router — call once at app
+     * start (idempotent). Safe to call after first access: nothing sends before
+     * the service/viewmodel are up.
+     */
+    fun initPersistentIdentity(context: android.content.Context) {
+        if (identityInitialized) return
+        identityInitialized = true
+        try {
+            cryptoManager.loadOrCreatePersistentIdentity(context.applicationContext)
+            localNodeId = CryptoManager.computeNodeId(cryptoManager.publicKeyBase64)
+            meshRouter.updateLocalIdentity(localNodeId)
+            android.util.Log.i("MeshNetworkManager", "Persistent mesh identity ready: $localNodeId")
+        } catch (e: Exception) {
+            android.util.Log.w("MeshNetworkManager", "Persistent identity init failed", e)
+        }
+    }
     
     var roomAesKey: javax.crypto.SecretKey? = null
     var myRsaKeyPair: java.security.KeyPair? = null
@@ -61,6 +83,8 @@ object MeshNetworkManager {
     fun initialize(context: Context) {
         if (isInitialized) return
         isInitialized = true
+        // bitchat parity: stable identity across restarts — before anything sends
+        initPersistentIdentity(context)
         meshRouter.localNodeName = android.os.Build.MODEL
 
         val appContext = context.applicationContext
@@ -204,6 +228,15 @@ class MeshForegroundService : Service() {
                 wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL, "MeshChat::WifiLock")
 
                 startObserving()
+                // bitchat parity: BLE presence announcements (30 s cadence) + peer table
+                com.aetherweb.app.PresenceManager.startAnnouncer(
+                    scope = scope,
+                    router = MeshNetworkManager.meshRouter,
+                    nameProvider = {
+                        val n = MeshNetworkManager._uiState.value.localUserName
+                        if (n.isNotBlank()) n else android.os.Build.MODEL
+                    }
+                )
             } catch (e: Exception) {
                 Log.e("MeshForegroundService", "Initialization error", e)
             }
@@ -274,6 +307,10 @@ class MeshForegroundService : Service() {
         scope.launch {
             manager.meshRouter.incomingMessages.collect { networkMessage ->
                 DiagnosticLogger.logMeshToWebHop(networkMessage.messageId, networkMessage.senderId, networkMessage.payload)
+                // bitchat parity: presence announces update the peer table — never shown as chat
+                if (com.aetherweb.app.PresenceManager.handleIncomingAnnounce(networkMessage.payload, networkMessage.senderId)) {
+                    return@collect
+                }
                 var handledSpecial = false
                 try {
                     val packet = com.aetherweb.app.protocol.MeshPacketCodec.decode(networkMessage.payload)
@@ -680,6 +717,15 @@ class MeshForegroundService : Service() {
         try { if (wifiLock?.isHeld == true) wifiLock?.release() } catch (e: Exception) {}
         wakeLock = null
         wifiLock = null
+        // bitchat parity: best-effort LEAVE announce so peer tables prune promptly
+        try {
+            val n = MeshNetworkManager._uiState.value.localUserName
+            com.aetherweb.app.PresenceManager.sendLeave(
+                MeshNetworkManager.meshRouter,
+                n.ifBlank { android.os.Build.MODEL }
+            )
+        } catch (e: Exception) {}
+        com.aetherweb.app.PresenceManager.stopAnnouncer()
         scope.cancel()
         MeshNetworkManager.hotspotManager?.stopHotspot()
         com.aetherweb.app.LocalDnsServer.stop()
