@@ -70,6 +70,76 @@ class BleMeshManager(private val context: Context) {
         DiagnosticLogger.log("BLE Optimizer", "Duty Cycle", "Adaptive duty cycle mode changed to: ${mode.label}", EventStatus.INFO)
     }
 
+    // Phase 1 thermal/battery safeguard: automatically drop to the ECO_SAVER duty
+    // cycle when the screen turns off or the battery runs low (<20%), and restore
+    // BALANCED when the screen comes back on or the battery recovers. The mesh
+    // keeps working — it just sniffs less often while idle.
+    private var throttleReceiver: android.content.BroadcastReceiver? = null
+    private var autoThrottleActive = false
+
+    fun initAutoThrottle() {
+        if (autoThrottleActive) return
+        autoThrottleActive = true
+        // Honor the current battery level immediately via the sticky battery broadcast.
+        try {
+            val battery = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+            val level = battery?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, 100) ?: 100
+            val scale = battery?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100) ?: 100
+            if (level * 100 / scale.coerceAtLeast(1) < 20) {
+                setDutyCycleMode(BleDutyCycle.ECO_SAVER)
+                android.util.Log.i("BleMeshManager", "Battery below 20% at startup — ECO_SAVER engaged")
+            }
+        } catch (e: Exception) { }
+
+        throttleReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(ctx: android.content.Context?, intent: android.content.Intent?) {
+                when (intent?.action) {
+                    android.content.Intent.ACTION_SCREEN_OFF -> {
+                        setDutyCycleMode(BleDutyCycle.ECO_SAVER)
+                        android.util.Log.i("BleMeshManager", "Screen off — throttling BLE to ECO_SAVER")
+                    }
+                    android.content.Intent.ACTION_SCREEN_ON -> {
+                        if (currentDutyCycle == BleDutyCycle.ECO_SAVER) {
+                            setDutyCycleMode(BleDutyCycle.BALANCED)
+                            android.util.Log.i("BleMeshManager", "Screen on — restoring BALANCED duty cycle")
+                        }
+                    }
+                    android.content.Intent.ACTION_BATTERY_LOW -> {
+                        setDutyCycleMode(BleDutyCycle.ECO_SAVER)
+                        android.util.Log.i("BleMeshManager", "Battery low — ECO_SAVER engaged")
+                    }
+                    android.content.Intent.ACTION_BATTERY_OKAY -> {
+                        if (currentDutyCycle == BleDutyCycle.ECO_SAVER) {
+                            setDutyCycleMode(BleDutyCycle.BALANCED)
+                            android.util.Log.i("BleMeshManager", "Battery recovered — restoring BALANCED duty cycle")
+                        }
+                    }
+                }
+            }
+        }
+        val filter = android.content.IntentFilter().apply {
+            addAction(android.content.Intent.ACTION_SCREEN_OFF)
+            addAction(android.content.Intent.ACTION_SCREEN_ON)
+            addAction(android.content.Intent.ACTION_BATTERY_LOW)
+            addAction(android.content.Intent.ACTION_BATTERY_OKAY)
+        }
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(throttleReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                context.registerReceiver(throttleReceiver, filter)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("BleMeshManager", "Auto-throttle receiver registration failed", e)
+        }
+    }
+
+    fun releaseAutoThrottle() {
+        try { throttleReceiver?.let { context.unregisterReceiver(it) } } catch (e: Exception) { }
+        throttleReceiver = null
+        autoThrottleActive = false
+    }
+
     val isCodedPhySupported: Boolean
         get() = (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && bluetoothAdapter?.isLeCodedPhySupported == true)
     
