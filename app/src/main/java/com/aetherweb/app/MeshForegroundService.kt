@@ -110,6 +110,7 @@ object MeshNetworkManager {
                 _uiState.update { it.copy(
                     messages = it.messages + webMsg
  ) }
+                AetherFeedManager.handleIncomingChatMessage(text, sender)
                 meshRouter.routeLocalMessage("${sender}: $text")
                 webServerManager?.broadcastMessage(text, sender)
             }
@@ -305,6 +306,7 @@ class MeshForegroundService : Service() {
                     com.aetherweb.app.MeshNetworkManager._uiState.update { it.copy(
                         messages = it.messages + newChatMessage
                     ) }
+                    AetherFeedManager.handleIncomingChatMessage(newChatMessage.message, newChatMessage.senderName)
                     val isGhostMode = com.aetherweb.app.MeshNetworkManager._uiState.value.isGhostMode
                     if (!isGhostMode) {
                         scope.launch(kotlinx.coroutines.Dispatchers.IO) {
