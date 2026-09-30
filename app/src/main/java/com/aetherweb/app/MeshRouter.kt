@@ -8,8 +8,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.GlobalScope
 import java.util.concurrent.ConcurrentHashMap
 
-class MeshRouter(private val localNodeId: String, private val cryptoManager: CryptoManager = CryptoManager()) {
+class MeshRouter(private var localNodeId: String, private val cryptoManager: CryptoManager = CryptoManager()) {
     var localNodeName: String = ""
+
+    companion object {
+        /** bitchat parity: maximum flood hops (MESSAGE_TTL_HOPS = 7). */
+        const val MAX_TTL_HOPS = 7
+    }
+
+    /** Applies a new stable identity (after persistent keypair load) without rebuilding the router. */
+    fun updateLocalIdentity(newNodeId: String) {
+        localNodeId = newNodeId
+        Log.i("MeshRouter", "Local identity updated to $newNodeId")
+    }
 
     data class NetworkMessage(
         val messageId: String,
@@ -83,6 +94,13 @@ class MeshRouter(private val localNodeId: String, private val cryptoManager: Cry
 
     private val chunkBuffer = ConcurrentHashMap<String, MutableMap<Int, String>>()
     private val chunkTimestamp = ConcurrentHashMap<String, Long>()
+    private val chunkByteSize = ConcurrentHashMap<String, Int>()
+
+    // bitchat parity (FragmentManager): harden CHUNK: reassembly against memory abuse
+    private val MAX_CHUNK_PARTS = 256
+    private val MAX_CHUNK_SET_BYTES = 1024 * 1024 // 1 MB per reassembly set
+    private val MAX_CHUNK_SETS = 64               // max concurrent reassembly sets
+    private val CHUNK_SET_TIMEOUT_MS = 30_000L    // 30 s reassembly timeout
 
     private fun emitDecrypted(message: NetworkMessage) {
         var finalPayload = message.payload
@@ -115,7 +133,28 @@ class MeshRouter(private val localNodeId: String, private val cryptoManager: Cry
                 val total = parts[3].toInt()
                 val data = parts[4]
 
+                // bitchat parity: reject abusive reassembly sets before buffering
+                if (total > MAX_CHUNK_PARTS || index < 0 || index >= total) {
+                    Log.w("MeshRouter", "Dropping CHUNK set $groupId: total=$total out of bounds")
+                    return
+                }
+                if (!chunkBuffer.containsKey(groupId) && chunkBuffer.size >= MAX_CHUNK_SETS) {
+                    Log.w("MeshRouter", "Dropping CHUNK set $groupId: too many concurrent sets")
+                    return
+                }
+
                 val groupMap = chunkBuffer.getOrPut(groupId) { ConcurrentHashMap() }
+                if (!groupMap.containsKey(index)) {
+                    val newSize = (chunkByteSize[groupId] ?: 0) + data.toByteArray(Charsets.UTF_8).size
+                    if (newSize > MAX_CHUNK_SET_BYTES) {
+                        Log.w("MeshRouter", "Dropping CHUNK set $groupId: exceeds 1 MB")
+                        chunkBuffer.remove(groupId)
+                        chunkTimestamp.remove(groupId)
+                        chunkByteSize.remove(groupId)
+                        return
+                    }
+                    chunkByteSize[groupId] = newSize
+                }
                 groupMap[index] = data
                 chunkTimestamp[groupId] = System.currentTimeMillis()
 
@@ -126,7 +165,8 @@ class MeshRouter(private val localNodeId: String, private val cryptoManager: Cry
                     }
                     chunkBuffer.remove(groupId)
                     chunkTimestamp.remove(groupId)
-                    
+                    chunkByteSize.remove(groupId)
+
                     val assembledMessage = message.copy(
                         messageId = groupId,
                         payload = fullPayload.toString()
@@ -204,7 +244,10 @@ class MeshRouter(private val localNodeId: String, private val cryptoManager: Cry
         messageCache[cacheKey] = now
         messageCache[message.messageId] = now
         Log.i("MeshRouter", "New verified identity-anchored message received: ${message.messageId} from ${message.senderId}")
-        
+
+        // bitchat parity: every verified packet refreshes BLE presence ("who's around")
+        PresenceManager.onPeerSeen(message.senderId, message.senderName)
+
         if (message.payload.startsWith("CHUNK:")) {
             handleChunk(message)
         } else {
@@ -212,26 +255,58 @@ class MeshRouter(private val localNodeId: String, private val cryptoManager: Cry
         }
 
         val newTtl = message.ttl - 1
-        if (newTtl > 0) {
+        if (newTtl > 0 && shouldRelay(newTtl)) {
             val rebroadcastMessage = message.copy(ttl = newTtl)
             Log.d("MeshRouter", "Rebroadcasting message ${message.messageId} with TTL $newTtl")
-            _outboundBroadcasts.tryEmit(rebroadcastMessage)
+            // bitchat parity: 8–26 ms relay jitter prevents synchronized rebroadcast collisions
+            GlobalScope.launch {
+                delay(java.util.concurrent.ThreadLocalRandom.current().nextLong(8, 27))
+                _outboundBroadcasts.tryEmit(rebroadcastMessage)
+            }
         } else {
-            Log.d("MeshRouter", "Message ${message.messageId} reached max hops (TTL=0). Dropping.")
+            Log.d("MeshRouter", "Message ${message.messageId} not relayed (TTL=$newTtl).")
         }
+    }
+
+    /**
+     * bitchat parity (PacketRelayManager): density-aware relay thinning.
+     * Small meshes always relay (p=1.0); large crowds thin probabilistically so
+     * chat stays smooth in a 200-person protest. Our per-peer token bucket above
+     * remains as the per-sender floor.
+     */
+    private fun shouldRelay(newTtl: Int): Boolean {
+        if (newTtl >= 4) return true
+        val size = PresenceManager.networkSize()
+        if (size <= 10) return true
+        val p = when {
+            size <= 30 -> 0.85
+            size <= 50 -> 0.70
+            size <= 100 -> 0.55
+            else -> 0.40
+        }
+        return Math.random() < p
     }
 
     fun routePacket(packet: com.aetherweb.app.protocol.MeshPacket) {
         routeLocalMessage(packet.toJsonString())
     }
 
-    fun routeLocalMessage(rawPayload: String) {
+    /**
+     * @param ttl initial flood hops (bitchat parity default: [MAX_TTL_HOPS])
+     * @param encrypt apply room AES when a room key exists; false for plaintext
+     *        presence announces (signed but readable by any nearby device)
+     */
+    fun routeLocalMessage(rawPayload: String, ttl: Int = MAX_TTL_HOPS, encrypt: Boolean = true) {
         try {
             // Network Throttling & Packet Compression: Compress raw payload if beneficial
             val compressed = com.aetherweb.app.NetworkUtils.compressPayload(rawPayload)
-            val payload = com.aetherweb.app.MeshNetworkManager.roomAesKey?.let { 
-                "ENC:" + com.aetherweb.app.CryptoManager.encryptAES(compressed, it) 
-            } ?: compressed
+            val payload = if (encrypt) {
+                com.aetherweb.app.MeshNetworkManager.roomAesKey?.let {
+                    "ENC:" + com.aetherweb.app.CryptoManager.encryptAES(compressed, it)
+                } ?: compressed
+            } else {
+                compressed
+            }
             val maxChunkSize = 450
             if (payload.length > maxChunkSize) {
                 val groupId = java.util.UUID.randomUUID().toString()
@@ -239,7 +314,7 @@ class MeshRouter(private val localNodeId: String, private val cryptoManager: Cry
                 kotlinx.coroutines.GlobalScope.launch {
                     chunks.forEachIndexed { index, chunkData ->
                         val chunkPayload = "CHUNK:$groupId:$index:${chunks.size}:$chunkData"
-                        sendNetworkMessage(chunkPayload)
+                        sendNetworkMessage(chunkPayload, ttl)
                         kotlinx.coroutines.delay(200)
                     }
                 }
@@ -251,7 +326,7 @@ class MeshRouter(private val localNodeId: String, private val cryptoManager: Cry
         }
     }
 
-    private fun sendNetworkMessage(payload: String) {
+    private fun sendNetworkMessage(payload: String, ttl: Int = MAX_TTL_HOPS) {
         try {
             val messageId = java.util.UUID.randomUUID().toString()
             val timestamp = System.currentTimeMillis()
@@ -264,7 +339,7 @@ class MeshRouter(private val localNodeId: String, private val cryptoManager: Cry
                 messageId = messageId,
                 senderId = localNodeId,
                 senderName = localNodeName,
-                ttl = 3,
+                ttl = ttl,
                 payload = payload,
                 timestamp = timestamp,
                 nonce = nonce,
@@ -296,11 +371,13 @@ class MeshRouter(private val localNodeId: String, private val cryptoManager: Cry
             }
         }
         
+        // bitchat parity: incomplete reassembly sets expire after 30 s (not 10 min)
         val chunkIterator = chunkTimestamp.entries.iterator()
         while (chunkIterator.hasNext()) {
             val entry = chunkIterator.next()
-            if (now - entry.value > CACHE_EXPIRY_MS) {
+            if (now - entry.value > CHUNK_SET_TIMEOUT_MS) {
                 chunkBuffer.remove(entry.key)
+                chunkByteSize.remove(entry.key)
                 chunkIterator.remove()
             }
         }
