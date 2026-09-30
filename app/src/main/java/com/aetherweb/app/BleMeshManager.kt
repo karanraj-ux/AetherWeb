@@ -231,7 +231,7 @@ class BleMeshManager(private val context: Context) {
                                 groupId = groupId,
                                 totalChunks = totalChunks,
                                 chunkIndex = i,
-                                ttl = 3,
+                                ttl = MeshRouter.MAX_TTL_HOPS,
                                 flags = BlePacketFramer.FLAG_CHUNK,
                                 chunkPayload = chunkData
                             )
