@@ -194,8 +194,8 @@ class MainActivity : ComponentActivity() {
                             AetherRoot(viewModel = viewModel)
                             com.aetherweb.app.ui.screens.CallScreenOverlay(
                                 sendMessage = { payload ->
-                                    com.aetherweb.app.SearchNetworkManager.meshRouter.routeLocalMessage(payload)
-                                    com.aetherweb.app.SearchNetworkManager.webServerManager?.broadcastMessage(payload, com.aetherweb.app.SearchNetworkManager.localNodeId)
+                                    com.aetherweb.app.MeshNetworkManager.meshRouter.routeLocalMessage(payload)
+                                    com.aetherweb.app.MeshNetworkManager.webServerManager?.broadcastMessage(payload, com.aetherweb.app.MeshNetworkManager.localNodeId)
                                 }
                             )
                         }
