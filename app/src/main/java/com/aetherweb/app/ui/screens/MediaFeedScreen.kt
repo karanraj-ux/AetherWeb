@@ -113,10 +113,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun MediaFeedScreen(
     viewModel: MeshViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    lockToReels: Boolean = false
 ) {
     val context = LocalContext.current
     var selectedMediaTab by remember { mutableIntStateOf(0) } // 0: Reels (Doomscroll), 1: YT Music
+    // When embedded as the Reels tab of a Room, lock to Reels and hide the switcher.
+    val effectiveTab = if (lockToReels) 0 else selectedMediaTab
     val posts by AetherFeedManager.posts.collectAsState()
     val scope = rememberCoroutineScope()
 
@@ -151,7 +154,8 @@ fun MediaFeedScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Segmented Pill / Tab Switcher (Reels vs Music)
+                // Segmented Pill / Tab Switcher (Reels vs Music) — hidden when locked to Reels
+                if (!lockToReels) {
                 Row(
                     modifier = Modifier
                         .background(Color(0xFF222222), RoundedCornerShape(20.dp))
@@ -206,9 +210,10 @@ fun MediaFeedScreen(
                         }
                     }
                 }
+                }
 
                 // Add to Feed action button
-                if (selectedMediaTab == 0) {
+                if (effectiveTab == 0) {
                     IconButton(
                         onClick = { mediaPickerLauncher.launch("*/*") },
                         modifier = Modifier
@@ -227,7 +232,7 @@ fun MediaFeedScreen(
         }
 
         // CONTENT
-        if (selectedMediaTab == 0) {
+        if (effectiveTab == 0) {
             // DOOMSCROLL REELS PAGER
             DoomscrollReelsView(
                 posts = posts,

@@ -1,6 +1,6 @@
 package com.aetherweb.app
-import com.aetherweb.app.ui.screens.MainChatScreen
-import com.aetherweb.app.ui.screens.CallScreenOverlay
+import com.aetherweb.app.ui.screens.AetherRoot
+import com.aetherweb.app.ui.screens.OnboardingScreens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.input.pointer.pointerInput
@@ -177,21 +177,29 @@ class MainActivity : ComponentActivity() {
                 }
                 
 
-                    
-                    androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
-                        MainChatScreen(
+                    // First-run onboarding (3 steps), then the Rooms-first root.
+                    val onboardPrefs = remember { this@MainActivity.getSharedPreferences("aether_onboarding", MODE_PRIVATE) }
+                    var onboardingDone by remember { mutableStateOf(onboardPrefs.getBoolean("done", false)) }
+
+                    if (!onboardingDone) {
+                        OnboardingScreens(
                             viewModel = viewModel,
-                            onLaunchLocationPermission = { permissionsState.launchMultiplePermissionRequest() }
-                        )
-                        CallScreenOverlay(
-                            sendMessage = { payload ->
-                                com.aetherweb.app.MeshNetworkManager.meshRouter.routeLocalMessage(payload)
-                                com.aetherweb.app.MeshNetworkManager.webServerManager?.broadcastMessage(payload, com.aetherweb.app.MeshNetworkManager.localNodeId)
+                            onDone = {
+                                onboardPrefs.edit().putBoolean("done", true).apply()
+                                onboardingDone = true
                             }
                         )
+                    } else {
+                        androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+                            AetherRoot(viewModel = viewModel)
+                            com.aetherweb.app.ui.screens.CallScreenOverlay(
+                                sendMessage = { payload ->
+                                    com.aetherweb.app.SearchNetworkManager.meshRouter.routeLocalMessage(payload)
+                                    com.aetherweb.app.SearchNetworkManager.webServerManager?.broadcastMessage(payload, com.aetherweb.app.SearchNetworkManager.localNodeId)
+                                }
+                            )
+                        }
                     }
-
-            }
         }
     }
 }
