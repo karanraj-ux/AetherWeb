@@ -1,6 +1,7 @@
 package com.aetherweb.app.ui.screens
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -58,6 +59,7 @@ import kotlinx.coroutines.launch
  * 3-page first-run onboarding with a dark campfire aesthetic.
  * Page 1: the idea. Page 2: pick a fire name. Page 3: start your first Room.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreens(viewModel: MeshViewModel, onDone: () -> Unit) {
     val uiState: MeshState by viewModel.uiState.collectAsStateWithLifecycle()

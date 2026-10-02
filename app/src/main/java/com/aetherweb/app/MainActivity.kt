@@ -200,6 +200,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+            }
         }
     }
 }
