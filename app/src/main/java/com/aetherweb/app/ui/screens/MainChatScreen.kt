@@ -3174,8 +3174,19 @@ fun ChatTab(
             }
         }
         var text by remember { mutableStateOf("") }
+        var showPollBuilder by remember { mutableStateOf(false) }
         val fileLauncher = rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
             uri?.let { viewModel.shareFile(it) }
+        }
+
+        if (showPollBuilder) {
+            PollBuilderDialog(
+                onDismiss = { showPollBuilder = false },
+                onStartPoll = { q, opts, uri ->
+                    viewModel.startPoll(q, opts, uri)
+                    showPollBuilder = false
+                }
+            )
         }
 
         ChatInput(
@@ -3189,6 +3200,7 @@ fun ChatTab(
                 text = ""
             },
             onFilePick = { fileLauncher.launch("*/*") },
+            onPollClick = { showPollBuilder = true },
             onCameraClick = {
                 photoPicker.launch(
                     androidx.activity.result.PickVisualMediaRequest(

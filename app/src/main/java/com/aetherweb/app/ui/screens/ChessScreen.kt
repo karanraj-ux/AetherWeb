@@ -63,7 +63,7 @@ fun ChessScreen(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     if (state.whitePlayerId.isEmpty()) {
                         Button(onClick = { onStateChange(ChessEngine.claimRole(state, myNodeId, "white")) }) { Text("Play White") }
-                        Button(onClick = { onStateChange(ChessEngine.claimRole(state, "bot", "white")) }) { Text("🤖 Bot White") }
+                        Button(onClick = { onStateChange(ChessEngine.maybeBotMove(ChessEngine.claimRole(state, "bot", "white"))) }) { Text("🤖 Bot White") }
                     } else if (isWhite) {
                         Button(onClick = { onStateChange(ChessEngine.leaveRole(state, myNodeId)) }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) { Text("Leave") }
                     } else {
@@ -72,7 +72,7 @@ fun ChessScreen(
 
                     if (state.blackPlayerId.isEmpty()) {
                         Button(onClick = { onStateChange(ChessEngine.claimRole(state, myNodeId, "black")) }) { Text("Play Black") }
-                        Button(onClick = { onStateChange(ChessEngine.claimRole(state, "bot", "black")) }) { Text("🤖 Bot Black") }
+                        Button(onClick = { onStateChange(ChessEngine.maybeBotMove(ChessEngine.claimRole(state, "bot", "black"))) }) { Text("🤖 Bot Black") }
                     } else if (isBlack) {
                         Button(onClick = { onStateChange(ChessEngine.leaveRole(state, myNodeId)) }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) { Text("Leave") }
                     } else {

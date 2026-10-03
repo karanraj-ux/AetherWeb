@@ -11,6 +11,16 @@ data class TicTacToeState(
     val winner: String = ""
 ) {
     
+    /**
+     * If the side to move is a bot, apply its move immediately.
+     * Call after claiming a bot seat — otherwise a bot playing X stalls,
+     * since the old code only triggered bot moves after a human move.
+     */
+    fun maybeBotMove(): TicTacToeState {
+        if (winner.isNotEmpty()) return this
+        return if ((isXTurn && xPlayerId == "bot") || (!isXTurn && oPlayerId == "bot")) makeBotMove() else this
+    }
+
     fun makeBotMove(): TicTacToeState {
         if (!board.contains("")) return this
         if (winner.isNotEmpty()) return this
@@ -102,6 +112,16 @@ data class Connect4State(
     val winner: String = ""
 ) {
     
+    /**
+     * If the side to move is a bot, apply its move immediately.
+     * Call after claiming a bot seat — otherwise a bot playing Red stalls,
+     * since the old code only triggered bot moves after a human move.
+     */
+    fun maybeBotMove(): Connect4State {
+        if (winner.isNotEmpty()) return this
+        return if ((isRedTurn && redPlayerId == "bot") || (!isRedTurn && yellowPlayerId == "bot")) makeBotMove() else this
+    }
+
     fun makeBotMove(): Connect4State {
         if (winner.isNotEmpty()) return this
         

@@ -54,9 +54,9 @@ fun TicTacToeScreen(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     if (state.xPlayerId.isEmpty() && state.oPlayerId != myNodeId) {
                         Button(onClick = { onStateChange(state.copy(xPlayerId = myNodeId)) }) { Text("Play X") }
-                        if (state.oPlayerId == myNodeId) Button(onClick = { onStateChange(state.copy(xPlayerId = "bot")) }) { Text("Bot X") }
+                        if (state.oPlayerId == myNodeId) Button(onClick = { onStateChange(state.copy(xPlayerId = "bot").maybeBotMove()) }) { Text("Bot X") }
                     } else if (state.xPlayerId.isEmpty() && state.oPlayerId == myNodeId) {
-                        Button(onClick = { onStateChange(state.copy(xPlayerId = "bot")) }) { Text("Add Bot X") }
+                        Button(onClick = { onStateChange(state.copy(xPlayerId = "bot").maybeBotMove()) }) { Text("Add Bot X") }
                     } else {
                         Text(if(isX) "You are X" else "X: Taken", color = if(isX) MaterialTheme.colorScheme.primary else Color.LightGray)
                     }
@@ -162,7 +162,7 @@ fun Connect4Screen(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     if (state.redPlayerId.isEmpty()) {
                         Button(onClick = { onStateChange(state.copy(redPlayerId = myNodeId)) }) { Text("Play Red") }
-                        Button(onClick = { onStateChange(state.copy(redPlayerId = "bot")) }) { Text("🤖 Bot Red") }
+                        Button(onClick = { onStateChange(state.copy(redPlayerId = "bot").maybeBotMove()) }) { Text("🤖 Bot Red") }
                     } else if (isRed) {
                         Button(onClick = { onStateChange(state.copy(redPlayerId = "")) }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) { Text("Leave") }
                     } else {

@@ -595,6 +595,7 @@ fun ChatInput(
     onSendMessage: (String) -> Unit,
     onFilePick: () -> Unit,
     onCameraClick: () -> Unit = {},
+    onPollClick: () -> Unit = {},
     onMicClick: () -> Unit,
     onCancelRecording: () -> Unit = onMicClick,
     isRecording: Boolean = false,
@@ -723,16 +724,34 @@ fun ChatInput(
                         maxLines = 5
                     )
 
-                    // Attach file icon
-                    IconButton(
-                        onClick = onFilePick,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.AttachFile,
-                            contentDescription = "Attach File",
-                            tint = WhatsAppSubtleText
-                        )
+                    // Attach menu (WhatsApp-style: document, poll)
+                    var showAttachMenu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(
+                            onClick = { showAttachMenu = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.AttachFile,
+                                contentDescription = "Attach",
+                                tint = WhatsAppSubtleText
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showAttachMenu,
+                            onDismissRequest = { showAttachMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Document") },
+                                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
+                                onClick = { showAttachMenu = false; onFilePick() }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Poll") },
+                                leadingIcon = { Icon(Icons.Default.BarChart, contentDescription = null) },
+                                onClick = { showAttachMenu = false; onPollClick() }
+                            )
+                        }
                     }
 
                     // Camera icon (WhatsApp style)

@@ -147,11 +147,20 @@ object ChessEngine {
         
         if (!isValidMove(state, fromIdx, toIdx, piece, isWhitePiece, targetPiece)) return state
 
-        val nextState = applyMove(state, fromIdx, toIdx, piece, targetPiece)
-        if (nextState.winner.isEmpty() && ((nextState.isWhiteTurn && nextState.whitePlayerId == "bot") || (!nextState.isWhiteTurn && nextState.blackPlayerId == "bot"))) {
-            return makeBotMove(nextState)
-        }
-        return nextState
+        return maybeBotMove(applyMove(state, fromIdx, toIdx, piece, targetPiece))
+    }
+
+    /**
+     * If the side to move is a bot, apply its move immediately.
+     * Safe to call after any state change (seat claim, reset, move) — the bot
+     * used to only respond to human moves, so a bot playing first (White)
+     * would stall the game forever.
+     */
+    fun maybeBotMove(state: ChessState): ChessState {
+        if (state.winner.isNotEmpty()) return state
+        val botToMove = (state.isWhiteTurn && state.whitePlayerId == "bot") ||
+                (!state.isWhiteTurn && state.blackPlayerId == "bot")
+        return if (botToMove) makeBotMove(state) else state
     }
 
     fun applyMove(state: ChessState, fromIdx: Int, toIdx: Int, piece: String, targetPiece: String): ChessState {
