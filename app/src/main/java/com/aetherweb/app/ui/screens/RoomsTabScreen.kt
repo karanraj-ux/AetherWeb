@@ -4,6 +4,7 @@ import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,17 +14,26 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +55,7 @@ import com.aetherweb.app.ui.components.QrShareSheet
 import com.aetherweb.app.ui.components.RoomCard
 import com.aetherweb.app.ui.components.RoomKind
 import com.aetherweb.app.ui.components.RosterSheet
+import com.aetherweb.app.ui.components.visiblePeers
 import com.aetherweb.app.ui.theme.AetherBackground
 import com.aetherweb.app.ui.theme.EmberOrange
 import com.aetherweb.app.ui.theme.flameGradient
@@ -64,9 +75,35 @@ fun RoomsTabScreen(
     val context = LocalContext.current
     var showQrSheet by remember { mutableStateOf(false) }
     var showRoster by remember { mutableStateOf(false) }
+    var showRadar by remember { mutableStateOf(false) }
     var joinCode by remember { mutableStateOf("") }
+    var joinRequested by remember { mutableStateOf(false) }
 
     val publicRoom = remember { AetherRoom(id = "public", name = "Public Mesh", kind = RoomKind.PUBLIC_MESH) }
+
+    // Join gate: once the hotspot join lands, open the Public Mesh room.
+    LaunchedEffect(joinRequested, uiState.isWifiConnected) {
+        if (joinRequested && uiState.isWifiConnected) {
+            joinRequested = false
+            onOpenRoom(publicRoom)
+        }
+    }
+
+    if (showRadar) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            RadarScreen(viewModel = viewModel)
+            IconButton(
+                onClick = { showRadar = false },
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(8.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+            }
+        }
+        return
+    }
 
     if (showQrSheet) {
         QrShareSheet(uiState = uiState, viewModel = viewModel, onDismiss = { showQrSheet = false })
@@ -149,7 +186,7 @@ fun RoomsTabScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 RoomCard(
                     room = publicRoom,
-                    memberCount = uiState.connectedNodes.size + 1,
+                    memberCount = uiState.visiblePeers().size + 1,
                     subtitle = "Campfire chat with everyone nearby",
                     onClick = { onOpenRoom(publicRoom) }
                 )
@@ -166,7 +203,7 @@ fun RoomsTabScreen(
                     }
                     RoomCard(
                         room = burnerRoom,
-                        memberCount = uiState.connectedNodes.size + 1,
+                        memberCount = uiState.visiblePeers().size + 1,
                         subtitle = "Vanishes in $mmss",
                         onClick = { onOpenRoom(burnerRoom) }
                     )
@@ -192,13 +229,36 @@ fun RoomsTabScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(
-                        onClick = { joinDiscoveredHotspot(context, viewModel) },
+                        onClick = { joinRequested = true; joinDiscoveredHotspot(context, viewModel) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Text(text = "Join", fontWeight = FontWeight.Bold)
                     }
-                } else {
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedCard(
+                    onClick = { showRadar = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.outlinedCardColors(containerColor = Color.Transparent)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Radar, contentDescription = null,
+                            tint = EmberOrange, modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Proximity radar", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text("See who's around on the map", color = Color(0xFF9AA0B4), fontSize = 12.sp)
+                        }
+                    }
+                }
+                if (ssid == null || uiState.isHotspotActive || uiState.isWifiConnected) {
                     // Ember empty state
                     Column(
                         modifier = Modifier
@@ -238,7 +298,7 @@ fun RoomsTabScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
-                    onClick = { joinDiscoveredHotspot(context, viewModel) },
+                    onClick = { joinRequested = true; joinDiscoveredHotspot(context, viewModel) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp)
                 ) {

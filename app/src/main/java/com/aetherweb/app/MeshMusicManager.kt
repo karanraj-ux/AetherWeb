@@ -40,7 +40,8 @@ data class MusicPlayerState(
     val partyHostName: String = "",
     val isShuffle: Boolean = false,
     val isRepeat: Boolean = false,
-    val volume: Float = 1.0f
+    val volume: Float = 1.0f,
+    val lastError: String? = null
 )
 
 /**
@@ -161,9 +162,26 @@ object MeshMusicManager {
         playTrack(track)
     }
 
+    private fun hasInternet(): Boolean {
+        val ctx = appContext ?: return false
+        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            ?: return false
+        val net = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(net) ?: return false
+        return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    fun clearError() { _state.update { it.copy(lastError = null) } }
+
     fun playTrack(track: MusicTrack) {
         val index = _state.value.playlist.indexOfFirst { it.id == track.id }
-        _state.update { it.copy(currentTrack = track, currentIndex = if (index != -1) index else it.currentIndex) }
+        _state.update { it.copy(currentTrack = track, currentIndex = if (index != -1) index else it.currentIndex, lastError = null) }
+
+        // Streams need the internet; local files don't. Fail loudly, not silently.
+        if (track.isStream && !hasInternet()) {
+            _state.update { it.copy(isPlaying = false, lastError = "No internet connection — live streams need one. Local files still play offline.") }
+            return
+        }
 
         scope.launch(Dispatchers.IO) {
             try {
@@ -196,7 +214,7 @@ object MeshMusicManager {
                     }
                     setOnErrorListener { _, what, extra ->
                         Log.e(TAG, "MediaPlayer error: what=$what, extra=$extra")
-                        _state.update { it.copy(isPlaying = false) }
+                        _state.update { it.copy(isPlaying = false, lastError = "Couldn't play this stream. Check your connection and try again.") }
                         true
                     }
                     prepareAsync()
@@ -204,7 +222,7 @@ object MeshMusicManager {
                 mediaPlayer = mp
             } catch (e: Exception) {
                 Log.e(TAG, "Error playing track ${track.title}", e)
-                _state.update { it.copy(isPlaying = false) }
+                _state.update { it.copy(isPlaying = false, lastError = "Couldn't play this track (${e.message ?: "unknown error"}).") }
             }
         }
     }

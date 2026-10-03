@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Pause
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -146,6 +148,39 @@ fun MusicTabScreen(modifier: Modifier = Modifier) {
         }
 
         Spacer(modifier = Modifier.height(10.dp))
+
+        // Playback error banner (streams fail silently otherwise)
+        val playbackError = playerState.lastError
+        if (playbackError != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF4A1D1D)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Warning, contentDescription = null,
+                        tint = Color(0xFFFF8A80), modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        playbackError, color = Color(0xFFFFCDD2),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = { MeshMusicManager.clearError() },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = Color(0xFFFFCDD2))
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
 
         // PARTY MODE / SILENT DISCO BAR
         Card(
@@ -276,14 +311,19 @@ fun MusicTabScreen(modifier: Modifier = Modifier) {
                 val sliderValue = (pos / dur).coerceIn(0f, 1f)
 
                 if (playerState.currentTrack?.isStream == true) {
+                    val streamLive = playerState.isPlaying
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(modifier = Modifier.size(8.dp).background(Color(0xFF25D366), CircleShape))
+                        Box(modifier = Modifier.size(8.dp).background(if (streamLive) Color(0xFF25D366) else Color.Gray, CircleShape))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("LIVE RADIO STREAM", color = Color(0xFF25D366), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Text(
+                            if (streamLive) "LIVE RADIO STREAM" else "STREAM — TAP PLAY",
+                            color = if (streamLive) Color(0xFF25D366) else Color.Gray,
+                            fontWeight = FontWeight.Bold, fontSize = 11.sp
+                        )
                     }
                 } else {
                     Slider(

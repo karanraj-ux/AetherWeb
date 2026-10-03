@@ -55,7 +55,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.aetherweb.app.CallManager
+import com.aetherweb.app.MeshNode
 import com.aetherweb.app.MeshState
 import com.aetherweb.app.MeshViewModel
 import com.aetherweb.app.QRCodeImage
@@ -467,10 +469,30 @@ fun QrShareSheet(uiState: MeshState, viewModel: MeshViewModel, onDismiss: () -> 
 // ---------------------------------------------------------------------------
 
 @OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Peers excluding this device itself. Some chipsets deliver our own BLE
+ * advertisement back to our scan callback, which would otherwise double-count
+ * us in every "N in room" label.
+ */
+@Composable
+fun MeshState.visiblePeers(): List<MeshNode> {
+    val context = LocalContext.current
+    val selfAddr = remember {
+        try {
+            val bm = context.getSystemService(android.content.Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+            bm?.adapter?.address
+        } catch (e: SecurityException) { null }
+    }
+    return remember(connectedNodes, selfAddr) {
+        if (selfAddr.isNullOrBlank()) connectedNodes
+        else connectedNodes.filter { it.id != selfAddr }
+    }
+}
+
 @Composable
 fun RosterSheet(uiState: MeshState, onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val members = uiState.connectedNodes.filter { it.name.isNotBlank() }
+    val members = uiState.visiblePeers().filter { it.name.isNotBlank() }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,

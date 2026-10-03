@@ -113,13 +113,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun MediaFeedScreen(
     viewModel: MeshViewModel,
-    modifier: Modifier = Modifier,
-    lockToReels: Boolean = false
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var selectedMediaTab by remember { mutableIntStateOf(0) } // 0: Reels (Doomscroll), 1: YT Music
-    // When embedded as the Reels tab of a Room, lock to Reels and hide the switcher.
-    val effectiveTab = if (lockToReels) 0 else selectedMediaTab
     val posts by AetherFeedManager.posts.collectAsState()
     val scope = rememberCoroutineScope()
 
@@ -154,8 +150,7 @@ fun MediaFeedScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Segmented Pill / Tab Switcher (Reels vs Music) — hidden when locked to Reels
-                if (!lockToReels) {
+                // Room-scoped reels feed (music lives in the room's Music tab / bottom nav)
                 Row(
                     modifier = Modifier
                         .background(Color(0xFF222222), RoundedCornerShape(20.dp))
@@ -165,8 +160,7 @@ fun MediaFeedScreen(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (selectedMediaTab == 0) Color(0xFFE1306C) else Color.Transparent)
-                            .clickable { selectedMediaTab = 0 }
+                            .background(Color(0xFFE1306C))
                             .padding(horizontal = 14.dp, vertical = 6.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -185,35 +179,10 @@ fun MediaFeedScreen(
                             )
                         }
                     }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (selectedMediaTab == 1) Color(0xFFFF0000) else Color.Transparent)
-                            .clickable { selectedMediaTab = 1 }
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Audiotrack,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "YT Music",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-                }
                 }
 
                 // Add to Feed action button
-                if (effectiveTab == 0) {
+                {
                     IconButton(
                         onClick = { mediaPickerLauncher.launch("*/*") },
                         modifier = Modifier
@@ -231,18 +200,12 @@ fun MediaFeedScreen(
             }
         }
 
-        // CONTENT
-        if (effectiveTab == 0) {
-            // DOOMSCROLL REELS PAGER
-            DoomscrollReelsView(
-                posts = posts,
-                viewModel = viewModel,
-                onAddMedia = { mediaPickerLauncher.launch("*/*") }
-            )
-        } else {
-            // YT MUSIC TAB VIEW
-            MusicTabScreen(modifier = Modifier.fillMaxSize())
-        }
+        // CONTENT — reels only (room-scoped shared camera roll)
+        DoomscrollReelsView(
+            posts = posts,
+            viewModel = viewModel,
+            onAddMedia = { mediaPickerLauncher.launch("*/*") }
+        )
     }
 }
 

@@ -124,6 +124,9 @@ data class MeshState(
 
 class MeshViewModel(application: Application) : AndroidViewModel(application) {
 
+    // Throttle for game-start chat announcements (one per game type per minute).
+    private val lastGameAnnounceAt = mutableMapOf<String, Long>()
+
     val uiState: StateFlow<MeshState> = MeshNetworkManager.uiState
     val diagnosticEvents: StateFlow<List<DiagnosticEvent>> = DiagnosticLogger.events
 
@@ -859,13 +862,18 @@ class MeshViewModel(application: Application) : AndroidViewModel(application) {
         
         
         if (type != "none") {
-            val niceName = when(type) {
-                "chess" -> "Standard Chess"
-                "ludo" -> "Mesh Ludo"
-                "web" -> "Web Media"
-                else -> type
+            val now = System.currentTimeMillis()
+            val last = lastGameAnnounceAt[type] ?: 0L
+            if (now - last > 60_000L) {
+                lastGameAnnounceAt[type] = now
+                val niceName = when(type) {
+                    "chess" -> "Standard Chess"
+                    "ludo" -> "Mesh Ludo"
+                    "web" -> "Web Media"
+                    else -> type
+                }
+                sendMessage("🎮 Started a match of $niceName! Head over to the Games tab to join or watch.")
             }
-            sendMessage("🎮 Started a match of $niceName! Head over to the Arcade tab to join or watch.")
         } else {
             sendMessage("🛑 The current game session has been closed.")
             // Reset game states

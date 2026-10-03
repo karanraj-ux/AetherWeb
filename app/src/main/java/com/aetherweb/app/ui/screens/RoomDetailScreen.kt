@@ -59,6 +59,7 @@ import com.aetherweb.app.ui.components.LinkIndicator
 import com.aetherweb.app.ui.components.QrShareSheet
 import com.aetherweb.app.ui.components.RosterSheet
 import com.aetherweb.app.ui.components.SosDialog
+import com.aetherweb.app.ui.components.visiblePeers
 import com.aetherweb.app.ui.theme.AetherBackground
 import com.aetherweb.app.ui.theme.FlameAmber
 import com.aetherweb.app.ui.theme.SosRed
@@ -135,7 +136,7 @@ fun RoomDetailScreen(
                             LinkIndicator(uiState = uiState, onClick = { showRoster = true })
                         }
                         val memberNames = remember(uiState.connectedNodes) {
-                            uiState.connectedNodes.map { it.name }
+                            uiState.visiblePeers().map { it.name }
                         }
                         Box(modifier = Modifier.clickable { showRoster = true }) {
                             AvatarStack(names = memberNames)
@@ -220,7 +221,7 @@ fun RoomDetailScreen(
                     )
                 }
             ) {
-                listOf("Chat", "Reels", "Games").forEachIndexed { index, title ->
+                listOf("Chat", "Reels", "Music", "Games").forEachIndexed { index, title ->
                     Tab(
                         selected = selectedRoomTab == index,
                         onClick = { selectedRoomTab = index },
@@ -246,11 +247,9 @@ fun RoomDetailScreen(
                         onUserClick = { selectedUser = it },
                         onNavigateToFeed = { selectedRoomTab = 1 }
                     )
-                    1 -> MediaFeedScreen(
-                        viewModel = viewModel,
-                        lockToReels = true
-                    )
-                    2 -> ArcadeTab(
+                    1 -> MediaFeedScreen(viewModel = viewModel)
+                    2 -> MusicTabScreen()
+                    3 -> ArcadeTab(
                         uiState = uiState,
                         viewModel = viewModel
                     )
