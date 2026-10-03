@@ -395,8 +395,8 @@ fun MainChatScreen(
                     NavigationBarItem(
                         selected = currentTab == "Media" || currentTab == "Music",
                         onClick = { currentTab = "Media" },
-                        icon = { Icon(Icons.Default.VideoLibrary, "Feed & Media") },
-                        label = { Text("Feed") }
+                        icon = { Icon(Icons.Default.VideoLibrary, "Stream") },
+                        label = { Text("Stream") }
                     )
                     NavigationBarItem(
                         selected = currentTab == "Calls",
@@ -424,8 +424,8 @@ fun MainChatScreen(
                     NavigationBarItem(
                         selected = currentTab == "Arcade",
                         onClick = { currentTab = "Arcade" },
-                        icon = { Icon(Icons.Default.Edit, "Arcade") },
-                        label = { Text("Arcade") }
+                        icon = { Icon(Icons.Default.Edit, "Games") },
+                        label = { Text("Games") }
                     )
                 }
             }
@@ -3346,7 +3346,47 @@ fun ArcadeTab(uiState: MeshState, viewModel: MeshViewModel) {
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 2. BENTO GRID 2-COLUMN TILES (CHESS & CONNECT 4)
+        // 2. CODE IDE — CREATE TOGETHER (SHOWCASE)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    viewModel.updateLocalSharedMedia("web", "http://$ip:8080/ide", com.aetherweb.app.MeshNetworkManager.localNodeId, "local", 0, true)
+                },
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF131C21)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF33444D))
+        ) {
+            Row(modifier = Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF38BDF8).copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("💻", fontSize = 24.sp)
+                }
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Code IDE",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        "Write HTML, JS & Python together — runs fully offline, no internet needed",
+                        fontSize = 11.sp,
+                        color = Color(0xFF8696A0)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // 3. BENTO GRID 2-COLUMN TILES (CHESS & CONNECT 4)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             BentoGameTile(
                 icon = "♟️",
@@ -3371,7 +3411,7 @@ fun ArcadeTab(uiState: MeshState, viewModel: MeshViewModel) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 3. BENTO GRID 2-COLUMN TILES (TIC-TAC-TOE & LUDO)
+        // 4. BENTO GRID 2-COLUMN TILES (TIC-TAC-TOE & LUDO)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             BentoGameTile(
                 icon = "⭕",
@@ -3396,7 +3436,7 @@ fun ArcadeTab(uiState: MeshState, viewModel: MeshViewModel) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 4. BENTO GRID 2-COLUMN TILES (8-BALL POOL & SNAKE)
+        // 5. BENTO GRID 2-COLUMN TILES (8-BALL POOL & SNAKE)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             BentoGameTile(
                 icon = "🎱",
@@ -3421,7 +3461,7 @@ fun ArcadeTab(uiState: MeshState, viewModel: MeshViewModel) {
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 5. PARTY TOOLS ROW (POLL & RANDOMIZER)
+        // 6. PARTY TOOLS ROW (POLL & RANDOMIZER)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             BentoGameTile(
                 icon = "📊",
@@ -3456,7 +3496,7 @@ fun ArcadeTab(uiState: MeshState, viewModel: MeshViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 6. POCKET CDN FULL WIDTH TILE
+        // 7. POCKET CDN FULL WIDTH TILE
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -3496,43 +3536,6 @@ fun ArcadeTab(uiState: MeshState, viewModel: MeshViewModel) {
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 7. OFFLINE WEB IDE FULL WIDTH TILE
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                    viewModel.updateLocalSharedMedia("web", "http://$ip:8080/ide", com.aetherweb.app.MeshNetworkManager.localNodeId, "local", 0, true)
-                },
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF131C21)),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF33444D))
-        ) {
-            Row(modifier = Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF38BDF8).copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("💻", fontSize = 24.sp)
-                }
-                Spacer(modifier = Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Offline Web IDE",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Text(
-                        "HTML/JS/CSS live editor with immediate offline browser preview",
-                        fontSize = 11.sp,
-                        color = Color(0xFF8696A0)
-                    )
-                }
-            }
-        }
 
         Spacer(modifier = Modifier.height(24.dp))
     }

@@ -865,7 +865,7 @@ class MeshViewModel(application: Application) : AndroidViewModel(application) {
                 "web" -> "Web Media"
                 else -> type
             }
-            sendMessage("🎮 Started a match of $niceName! Head over to the Arcade tab to join or watch.")
+            sendMessage("🎮 Started a match of $niceName! Head over to the Games tab to join or watch.")
         } else {
             sendMessage("🛑 The current game session has been closed.")
             // Reset game states

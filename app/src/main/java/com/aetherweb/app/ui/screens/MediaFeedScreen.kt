@@ -174,7 +174,7 @@ fun MediaFeedScreen(
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                text = "Reels Feed",
+                                text = "Videos",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -198,7 +198,7 @@ fun MediaFeedScreen(
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                text = "YT Music",
+                                text = "Music",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
