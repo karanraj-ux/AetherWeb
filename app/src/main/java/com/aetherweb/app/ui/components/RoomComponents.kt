@@ -468,7 +468,6 @@ fun QrShareSheet(uiState: MeshState, viewModel: MeshViewModel, onDismiss: () -> 
 // RosterSheet — member list with avatar circles, plus a "you" row.
 // ---------------------------------------------------------------------------
 
-@OptIn(ExperimentalMaterial3Api::class)
 /**
  * Peers excluding this device itself. Some chipsets deliver our own BLE
  * advertisement back to our scan callback, which would otherwise double-count
@@ -489,6 +488,7 @@ fun MeshState.visiblePeers(): List<MeshNode> {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RosterSheet(uiState: MeshState, onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)

@@ -135,8 +135,9 @@ fun RoomDetailScreen(
                             Spacer(modifier = Modifier.height(3.dp))
                             LinkIndicator(uiState = uiState, onClick = { showRoster = true })
                         }
-                        val memberNames = remember(uiState.connectedNodes) {
-                            uiState.visiblePeers().map { it.name }
+                        val peers = uiState.visiblePeers()
+                        val memberNames = remember(peers) {
+                            peers.map { it.name }
                         }
                         Box(modifier = Modifier.clickable { showRoster = true }) {
                             AvatarStack(names = memberNames)

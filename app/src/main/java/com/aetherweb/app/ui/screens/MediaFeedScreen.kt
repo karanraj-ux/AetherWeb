@@ -182,20 +182,18 @@ fun MediaFeedScreen(
                 }
 
                 // Add to Feed action button
-                {
-                    IconButton(
-                        onClick = { mediaPickerLauncher.launch("*/*") },
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(Color(0xFF262626), CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add Media to Feed",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                IconButton(
+                    onClick = { mediaPickerLauncher.launch("*/*") },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(Color(0xFF262626), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add Media to Feed",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
