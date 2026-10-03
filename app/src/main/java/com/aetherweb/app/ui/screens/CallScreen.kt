@@ -29,6 +29,9 @@ import android.graphics.SurfaceTexture
 import android.view.Surface
 import android.view.TextureView
 import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import com.aetherweb.app.CallManager
 import com.aetherweb.app.CallState
 import com.aetherweb.app.LiveVideoState
@@ -46,6 +49,27 @@ fun CallScreenOverlay(
 
     val proximityHelper = remember { ProximitySensorHelper(context) }
     val isNearEar by proximityHelper.isNear.collectAsState()
+
+    // Calls need mic (audio) and camera (video) at runtime. Without this the
+    // call connects but LiveVoiceManager silently captures nothing.
+    val callPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        if (grants[android.Manifest.permission.RECORD_AUDIO] == true) {
+            CallManager.ensureMediaRunning()
+        }
+    }
+    LaunchedEffect(callSession.state) {
+        if (callSession.state != CallState.IDLE) {
+            val missing = listOf(
+                android.Manifest.permission.RECORD_AUDIO,
+                android.Manifest.permission.CAMERA
+            ).filter {
+                ContextCompat.checkSelfPermission(context, it) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            }
+            if (missing.isNotEmpty()) callPermissionLauncher.launch(missing.toTypedArray())
+        }
+    }
 
     DisposableEffect(callSession.state, callSession.isVideoEnabled) {
         if (callSession.state == CallState.ACTIVE && !callSession.isVideoEnabled) {

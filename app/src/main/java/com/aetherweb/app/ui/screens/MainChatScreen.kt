@@ -3445,7 +3445,7 @@ fun ArcadeTab(uiState: MeshState, viewModel: MeshViewModel) {
                 badge = "Web & App",
                 accentColor = Color(0xFF3B82F6),
                 modifier = Modifier.weight(1f),
-                onClick = { viewModel.updateLocalSharedMedia("web", "http://$ip:8080/sim/physics", com.aetherweb.app.MeshNetworkManager.localNodeId, "collaborative", 2, true) }
+                onClick = { viewModel.updateLocalSharedMedia("web", "http://$ip:8080/pool", com.aetherweb.app.MeshNetworkManager.localNodeId, "collaborative", 2, true) }
             )
 
             BentoGameTile(

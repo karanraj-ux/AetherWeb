@@ -220,6 +220,16 @@ object CallManager {
         startAudioSession()
     }
 
+    /**
+     * Re-run audio (and video, if enabled) startup. Called after the user
+     * grants RECORD_AUDIO/CAMERA mid-call — startBroadcasting() silently
+     * aborts without the permission, so the session must be restarted once
+     * it is granted.
+     */
+    fun ensureMediaRunning() {
+        if (_callSession.value.state == CallState.ACTIVE) startAudioSession()
+    }
+
     private fun startAudioSession() {
         startCallTimer()
         val peerIp = _callSession.value.peerIp.takeIf { it.isNotBlank() }
