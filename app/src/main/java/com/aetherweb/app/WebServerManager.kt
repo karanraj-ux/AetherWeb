@@ -220,26 +220,36 @@ class WebServerManager(
         try {
             System.setProperty("io.netty.noUnsafe", "true")
             System.setProperty("io.netty.transport.noNative", "true")
-            server = embeddedServer(Netty, port = port, host = "0.0.0.0") {
-                // Voice Room Phase 0: second connector serving the SAME app over HTTPS (:8443).
-                // Browsers require a secure context for microphone access; guests accept the
-                // self-signed cert once ("Advanced -> Proceed"). Plain HTTP on :8080 untouched.
-                try {
-                    val certIp = try { NetworkUtils.getLocalIpAddress() } catch (e: Exception) { "192.168.49.1" }
-                    val ks = PortalCertManager.getOrCreateKeyStore(certIp)
-                    sslConnector(
-                        keyStore = ks,
-                        keyAlias = PortalCertManager.KEY_ALIAS,
-                        keyStorePassword = { PortalCertManager.keyStorePassword() },
-                        privateKeyPassword = { PortalCertManager.keyStorePassword() }
-                    ) {
-                        port = PortalCertManager.HTTPS_PORT
-                        host = "0.0.0.0"
-                    }
-                    android.util.Log.d("WebServer", "HTTPS voice connector enabled on port ${PortalCertManager.HTTPS_PORT}")
-                } catch (e: Exception) {
-                    android.util.Log.e("WebServer", "HTTPS connector unavailable (voice over web disabled this session)", e)
+            // Voice Room Phase 0: explicit engine connectors. Ktor 3.x removed the
+            // configure lambda from embeddedServer (the trailing lambda is the
+            // Application module), so the HTTPS connector is built up-front and
+            // passed via the vararg-connectors overload. :8443 serves the SAME
+            // app over HTTPS — browsers require a secure context for microphone
+            // access; guests accept the self-signed cert once ("Advanced ->
+            // Proceed"). Plain HTTP on :8080 is untouched.
+            val httpPort = port
+            val engineConnectors = mutableListOf<io.ktor.server.engine.EngineConnectorConfig>()
+            engineConnectors += io.ktor.server.engine.EngineConnectorBuilder().apply {
+                this.port = httpPort
+                this.host = "0.0.0.0"
+            }
+            try {
+                val certIp = try { NetworkUtils.getLocalIpAddress() } catch (e: Exception) { "192.168.49.1" }
+                val ks = PortalCertManager.getOrCreateKeyStore(certIp)
+                engineConnectors += io.ktor.server.engine.EngineSSLConnectorBuilder(
+                    keyStore = ks,
+                    keyAlias = PortalCertManager.KEY_ALIAS,
+                    keyStorePassword = { PortalCertManager.keyStorePassword() },
+                    privateKeyPassword = { PortalCertManager.keyStorePassword() }
+                ).apply {
+                    this.port = PortalCertManager.HTTPS_PORT
+                    this.host = "0.0.0.0"
                 }
+                android.util.Log.d("WebServer", "HTTPS voice connector enabled on port ${PortalCertManager.HTTPS_PORT}")
+            } catch (e: Exception) {
+                android.util.Log.e("WebServer", "HTTPS connector unavailable (voice over web disabled this session)", e)
+            }
+            server = kotlinx.coroutines.GlobalScope.embeddedServer(Netty, *engineConnectors.toTypedArray()) {
                 install(io.ktor.server.websocket.WebSockets) {
                     // Battery Consumption: Adaptive duty cycle for WebSocket keep-alives (30s ping, 45s timeout)
                     pingPeriod = kotlin.time.Duration.parse("30s")

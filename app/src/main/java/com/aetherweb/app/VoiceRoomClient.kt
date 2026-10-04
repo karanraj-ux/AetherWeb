@@ -19,7 +19,7 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
-import okio.toByteString
+import okio.ByteString.Companion.toByteString
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.Collections
