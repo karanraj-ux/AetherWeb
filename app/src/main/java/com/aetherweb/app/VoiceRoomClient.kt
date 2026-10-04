@@ -19,6 +19,7 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
+import okio.toByteString
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.Collections
@@ -306,7 +307,7 @@ class VoiceRoomClient(private val context: Context) {
                 frame[1] = idBytes.size.toByte()
                 System.arraycopy(idBytes, 0, frame, 2, idBytes.size)
                 System.arraycopy(pcm, 0, frame, 2 + idBytes.size, read)
-                try { ws?.send(ByteString.of(frame, 0, frame.size)) } catch (e: Exception) { /* ignore */ }
+                try { ws?.send(frame.toByteString()) } catch (e: Exception) { /* ignore */ }
             }
             try { rec.stop() } catch (e: Exception) { /* ignore */ }
             try { rec.release() } catch (e: Exception) { /* ignore */ }

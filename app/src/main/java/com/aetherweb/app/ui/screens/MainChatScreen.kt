@@ -124,6 +124,9 @@ fun MainChatScreen(
         )
     }
 
+    // Voice Room Phase 2: dashboard bottom sheet state (declared before first use).
+    var showVoiceRoomSheet by remember { mutableStateOf(false) }
+
     // Voice Room Phase 1: named voice-join approval (profile attached, no raw IDs).
     if (uiState.pendingVoiceRequests.isNotEmpty()) {
         val req = uiState.pendingVoiceRequests.first()
@@ -176,8 +179,6 @@ fun MainChatScreen(
     var showRoomSetupDialog by remember { mutableStateOf(false) }
     var showRosterDialog by remember { mutableStateOf(false) }
     var showProfileDialog by remember { mutableStateOf(false) }
-    // Voice Room Phase 2: dashboard bottom sheet.
-    var showVoiceRoomSheet by remember { mutableStateOf(false) }
     var profileNameInput by remember { mutableStateOf(uiState.localUserName) }
     var profileUsernameIdInput by remember { mutableStateOf(uiState.localUsernameId) }
     var profileIsPermanent by remember { mutableStateOf(uiState.isUsernamePermanent) }

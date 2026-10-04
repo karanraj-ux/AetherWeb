@@ -94,7 +94,7 @@ class WebServerManager(
         var name: String,
         var emoji: String,
         var kind: String, // "host" | "member" | "temp"
-        val session: io.ktor.websocket.WebSocketServerSession,
+        val session: io.ktor.server.websocket.WebSocketServerSession,
         @Volatile var lastFrameAt: Long = 0L,
         @Volatile var speaking: Boolean = false,
         @Volatile var micOn: Boolean = false
@@ -231,10 +231,11 @@ class WebServerManager(
                         keyStore = ks,
                         keyAlias = PortalCertManager.KEY_ALIAS,
                         keyStorePassword = { PortalCertManager.keyStorePassword() },
-                        privateKeyPassword = { PortalCertManager.keyStorePassword() },
-                        port = PortalCertManager.HTTPS_PORT,
+                        privateKeyPassword = { PortalCertManager.keyStorePassword() }
+                    ) {
+                        port = PortalCertManager.HTTPS_PORT
                         host = "0.0.0.0"
-                    )
+                    }
                     android.util.Log.d("WebServer", "HTTPS voice connector enabled on port ${PortalCertManager.HTTPS_PORT}")
                 } catch (e: Exception) {
                     android.util.Log.e("WebServer", "HTTPS connector unavailable (voice over web disabled this session)", e)
