@@ -95,6 +95,24 @@ class WebServerManager(
             System.setProperty("io.netty.noUnsafe", "true")
             System.setProperty("io.netty.transport.noNative", "true")
             server = embeddedServer(Netty, port = port, host = "0.0.0.0") {
+                // Voice Room Phase 0: second connector serving the SAME app over HTTPS (:8443).
+                // Browsers require a secure context for microphone access; guests accept the
+                // self-signed cert once ("Advanced -> Proceed"). Plain HTTP on :8080 untouched.
+                try {
+                    val certIp = try { NetworkUtils.getLocalIpAddress() } catch (e: Exception) { "192.168.49.1" }
+                    val ks = PortalCertManager.getOrCreateKeyStore(certIp)
+                    sslConnector(
+                        keyStore = ks,
+                        keyAlias = PortalCertManager.KEY_ALIAS,
+                        keyStorePassword = { PortalCertManager.keyStorePassword() },
+                        privateKeyPassword = { PortalCertManager.keyStorePassword() },
+                        port = PortalCertManager.HTTPS_PORT,
+                        host = "0.0.0.0"
+                    )
+                    android.util.Log.d("WebServer", "HTTPS voice connector enabled on port ${PortalCertManager.HTTPS_PORT}")
+                } catch (e: Exception) {
+                    android.util.Log.e("WebServer", "HTTPS connector unavailable (voice over web disabled this session)", e)
+                }
                 install(io.ktor.server.websocket.WebSockets) {
                     // Battery Consumption: Adaptive duty cycle for WebSocket keep-alives (30s ping, 45s timeout)
                     pingPeriod = kotlin.time.Duration.parse("30s")

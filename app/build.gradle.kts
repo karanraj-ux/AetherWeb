@@ -115,6 +115,9 @@ dependencies {
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
   implementation(libs.retrofit)
+  // Voice Room Phase 0: self-signed HTTPS cert generation for browser mic access
+  implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+  implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
