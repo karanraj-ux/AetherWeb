@@ -140,6 +140,15 @@ fun MainChatScreen(
         )
     }
 
+    // Voice Room Phase 2: dashboard bottom sheet.
+    if (showVoiceRoomSheet) {
+        VoiceRoomSheet(
+            onDismiss = { showVoiceRoomSheet = false },
+            canHost = uiState.isHotspotActive,
+            hostName = uiState.localUserName
+        )
+    }
+
     LaunchedEffect(uiState.isHotspotActive) {
         if (uiState.isHotspotActive) showHotspotDialog = true
         else showHotspotDialog = false
@@ -166,6 +175,8 @@ fun MainChatScreen(
     var showRoomSetupDialog by remember { mutableStateOf(false) }
     var showRosterDialog by remember { mutableStateOf(false) }
     var showProfileDialog by remember { mutableStateOf(false) }
+    // Voice Room Phase 2: dashboard bottom sheet.
+    var showVoiceRoomSheet by remember { mutableStateOf(false) }
     var profileNameInput by remember { mutableStateOf(uiState.localUserName) }
     var profileUsernameIdInput by remember { mutableStateOf(uiState.localUsernameId) }
     var profileIsPermanent by remember { mutableStateOf(uiState.isUsernamePermanent) }
@@ -305,6 +316,13 @@ fun MainChatScreen(
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(Icons.Default.Call, contentDescription = "Start Call", tint = Color(0xFFE9EDEF), modifier = Modifier.size(22.dp))
+                        }
+                        // Voice Room Phase 2: Discord-style voice dashboard, right in the chat room.
+                        IconButton(
+                            onClick = { showVoiceRoomSheet = true },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(Icons.Default.Mic, contentDescription = "Voice Room", tint = Color(0xFFE9EDEF), modifier = Modifier.size(22.dp))
                         }
                         // Unified QR / Share Button
                         IconButton(

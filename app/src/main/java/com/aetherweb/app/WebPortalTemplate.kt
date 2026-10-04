@@ -349,6 +349,7 @@ object WebPortalTemplate {
             </div>
             <div class="header-actions">
                 <button class="action-btn" onclick="toggleTheme()" id="theme-btn" title="Toggle Dark/Light">🌓</button>
+                <button class="action-btn" onclick="toggleVoicePanel()" id="voice-btn" title="Voice Room">🎙</button>
                 <a href="/download" class="action-btn green" download="MeshChat.apk" title="Download Android APK">⬇️ APK</a>
             </div>
         </header>
@@ -539,6 +540,21 @@ object WebPortalTemplate {
                 <span>Tools</span>
             </button>
         </nav>
+    </div>
+
+    <!-- Voice Room Phase 2: dashboard panel -->
+    <div id="voice-panel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:var(--card-bg);border-radius:12px;padding:20px;width:320px;max-height:80vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <div style="font-weight:bold;font-size:16px;">Voice Room</div>
+                <button onclick="toggleVoicePanel()" style="background:none;border:none;color:var(--text-secondary);font-size:18px;cursor:pointer;">&#10005;</button>
+            </div>
+            <div id="voice-panel-status" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">A live voice channel for everyone in this room.</div>
+            <div id="voice-https-warning" style="display:none;background:#7a4a00;color:#ffe0b2;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px;"></div>
+            <button id="voice-join-btn" onclick="requestVoiceJoin()" class="action-btn green" style="width:100%;justify-content:center;padding:10px;margin-bottom:8px;">Join Voice Room</button>
+            <button id="voice-mic-btn" onclick="toggleVoiceMic()" class="action-btn" style="display:none;width:100%;justify-content:center;padding:10px;margin-bottom:8px;">Mic Off</button>
+            <div id="voice-members" style="display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
     </div>
 
     <!-- Client Script (Persistent WebSocket + Navigation Engine) -->
@@ -908,6 +924,66 @@ object WebPortalTemplate {
 
         // Voice Room Phase 1: first visit -> force temp-profile setup.
         try { if (!localStorage.getItem('aether_profile')) openProfileModal(); } catch(e) {}
+
+        // Voice Room Phase 2: dashboard panel (audio pipe lands in Phase 3).
+        let voicePanelState = 'idle'; // idle | requested | joined
+        function toggleVoicePanel() {
+            const p = document.getElementById('voice-panel');
+            const open = p.style.display !== 'flex';
+            p.style.display = open ? 'flex' : 'none';
+            if (open) updateVoicePanel();
+        }
+        function updateVoicePanel() {
+            const warn = document.getElementById('voice-https-warning');
+            if (window.location.protocol !== 'https:') {
+                warn.style.display = 'block';
+                warn.innerHTML = 'Mic needs a secure page. Open the voice portal: <a id="voice-https-link" style="color:#ffe0b2;font-weight:bold;" target="_blank">tap here for HTTPS</a>';
+                document.getElementById('voice-https-link').href = 'https://' + window.location.hostname + ':8443/';
+            } else {
+                warn.style.display = 'none';
+            }
+            const joinBtn = document.getElementById('voice-join-btn');
+            const micBtn = document.getElementById('voice-mic-btn');
+            const status = document.getElementById('voice-panel-status');
+            if (voicePanelState === 'idle') {
+                joinBtn.style.display = 'block';
+                micBtn.style.display = 'none';
+                status.innerText = 'A live voice channel for everyone in this room.';
+            } else if (voicePanelState === 'requested') {
+                joinBtn.style.display = 'none';
+                micBtn.style.display = 'none';
+                status.innerText = 'Request sent — waiting for the host to allow voice...';
+            } else {
+                joinBtn.style.display = 'none';
+                micBtn.style.display = 'block';
+                status.innerText = 'You are in the voice room.';
+            }
+        }
+        async function requestVoiceJoin() {
+            try {
+                const res = await fetch('/api/voice/request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: myName, emoji: myEmoji, pid: myProfile.pid })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    voicePanelState = 'requested';
+                } else {
+                    document.getElementById('voice-panel-status').innerText = 'Could not request voice: ' + (data.reason || 'error');
+                }
+            } catch(e) {
+                document.getElementById('voice-panel-status').innerText = 'Could not reach the host.';
+            }
+            updateVoicePanel();
+        }
+        function toggleVoiceMic() {
+            // Phase 3 wires the real mic + /ws-voice audio pipe; Phase 2 is the UI shell.
+            const b = document.getElementById('voice-mic-btn');
+            const isOff = b.innerText.indexOf('Off') !== -1;
+            b.innerText = isOff ? 'Mic On' : 'Mic Off';
+            b.classList.toggle('green', isOff);
+        }
 
         async function handleSendChat(e) {
             e.preventDefault();
