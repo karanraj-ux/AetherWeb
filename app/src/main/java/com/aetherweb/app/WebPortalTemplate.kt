@@ -969,6 +969,7 @@ object WebPortalTemplate {
                 const data = await res.json();
                 if (data.ok) {
                     voicePanelState = 'requested';
+                    startVoiceStatusPoll();
                 } else {
                     document.getElementById('voice-panel-status').innerText = 'Could not request voice: ' + (data.reason || 'error');
                 }
@@ -977,12 +978,195 @@ object WebPortalTemplate {
             }
             updateVoicePanel();
         }
+        // Voice Room Phase 3: real mic + /ws-voice audio pipe (16kHz PCM16, VAD-gated).
+        let voiceAudio = null; // {ctx, stream, proc, src, ws, playNext, mutedByMe:Set}
+        let voiceStatusTimer = null;
+
         function toggleVoiceMic() {
-            // Phase 3 wires the real mic + /ws-voice audio pipe; Phase 2 is the UI shell.
             const b = document.getElementById('voice-mic-btn');
             const isOff = b.innerText.indexOf('Off') !== -1;
-            b.innerText = isOff ? 'Mic On' : 'Mic Off';
-            b.classList.toggle('green', isOff);
+            if (isOff) {
+                startVoiceMic().then(ok => {
+                    if (ok) { b.innerText = 'Mic On'; b.classList.add('green'); }
+                });
+            } else {
+                stopVoiceMic();
+                b.innerText = 'Mic Off';
+                b.classList.remove('green');
+            }
+        }
+
+        function closeVoiceSocket() {
+            if (voiceAudio && voiceAudio.ws) {
+                try { voiceAudio.ws.close(); } catch(e) {}
+            }
+        }
+
+        function stopVoiceMic() {
+            if (!voiceAudio) return;
+            try { voiceAudio.proc.disconnect(); } catch(e) {}
+            try { voiceAudio.src.disconnect(); } catch(e) {}
+            try { voiceAudio.stream.getTracks().forEach(t => t.stop()); } catch(e) {}
+            try { voiceAudio.ctx.close(); } catch(e) {}
+            closeVoiceSocket();
+            voiceAudio = null;
+        }
+
+        async function startVoiceMic() {
+            if (window.location.protocol !== 'https:') {
+                alert('Voice needs the secure portal. Use the HTTPS link above.');
+                return false;
+            }
+            if (voiceAudio) stopVoiceMic();
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                });
+            } catch(e) {
+                alert('Microphone blocked: ' + e.message);
+                return false;
+            }
+            const AC = window.AudioContext || window.webkitAudioContext;
+            let ctx;
+            try {
+                ctx = new AC({ sampleRate: 16000 });
+            } catch(e) {
+                ctx = new AC();
+            }
+            try { if (ctx.state === 'suspended') await ctx.resume(); } catch(e) {}
+
+            const wsUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host +
+                '/ws-voice?pid=' + encodeURIComponent(myProfile.pid) +
+                '&sender=' + encodeURIComponent(myName) +
+                '&emoji=' + encodeURIComponent(myEmoji) + '&kind=temp';
+            const ws = new WebSocket(wsUrl);
+            ws.binaryType = 'arraybuffer';
+            const mutedByMe = (voiceAudio && voiceAudio.mutedByMe) || new Set();
+            const va = { ctx: ctx, stream: stream, proc: null, src: null, ws: ws, playNext: 0, mutedByMe: mutedByMe };
+            voiceAudio = va;
+
+            ws.onopen = () => {
+                try { ws.send(JSON.stringify({ type: 'join', name: myName, emoji: myEmoji, pid: myProfile.pid })); } catch(e) {}
+            };
+            ws.onmessage = (ev) => {
+                if (typeof ev.data === 'string') {
+                    try { handleVoiceState(JSON.parse(ev.data)); } catch(e) {}
+                } else {
+                    playVoiceFrame(ev.data);
+                }
+            };
+            ws.onclose = () => { /* mic stays warm; user can toggle off/on */ };
+
+            const src = ctx.createMediaStreamSource(stream);
+            const proc = ctx.createScriptProcessor(2048, 1, 1);
+            va.src = src; va.proc = proc;
+            const pidBytes = new TextEncoder().encode(myProfile.pid);
+            let hangover = 0;
+            proc.onaudioprocess = (e) => {
+                if (!voiceAudio || ws.readyState !== WebSocket.OPEN) return;
+                const inRate = e.inputBuffer.sampleRate || 16000;
+                const inData = e.inputBuffer.getChannelData(0);
+                // Downsample to 16kHz when the context runs faster (e.g. 48kHz).
+                let input = inData;
+                if (Math.abs(inRate - 16000) > 1) {
+                    const ratio = Math.max(1, Math.round(inRate / 16000));
+                    const outLen = Math.floor(inData.length / ratio);
+                    const down = new Float32Array(outLen);
+                    for (let i = 0; i < outLen; i++) down[i] = inData[i * ratio];
+                    input = down;
+                }
+                // Energy VAD: only transmit actual speech.
+                let sum = 0;
+                for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
+                const rms = Math.sqrt(sum / input.length);
+                if (rms > 0.02) hangover = 25; else if (hangover > 0) hangover--;
+                if (hangover === 0) return;
+                const pcm = new Int16Array(input.length);
+                for (let i = 0; i < input.length; i++) {
+                    const s = Math.max(-1, Math.min(1, input[i]));
+                    pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
+                const frame = new Uint8Array(2 + pidBytes.length + pcm.length * 2);
+                frame[0] = 1;
+                frame[1] = pidBytes.length;
+                frame.set(pidBytes, 2);
+                frame.set(new Uint8Array(pcm.buffer), 2 + pidBytes.length);
+                try { ws.send(frame.buffer); } catch(err) {}
+            };
+            src.connect(proc);
+            proc.connect(ctx.destination);
+            return true;
+        }
+
+        function playVoiceFrame(buf) {
+            if (!voiceAudio) return;
+            const u8 = new Uint8Array(buf);
+            if (u8.length < 3 || u8[0] !== 1) return;
+            const idLen = u8[1];
+            if (u8.length < 2 + idLen) return;
+            const senderId = new TextDecoder().decode(u8.slice(2, 2 + idLen));
+            if (voiceAudio.mutedByMe.has(senderId)) return;
+            const pcmBytes = u8.slice(2 + idLen);
+            const n = Math.floor(pcmBytes.length / 2);
+            if (n === 0) return;
+            const pcm = new Int16Array(pcmBytes.buffer, pcmBytes.byteOffset, n);
+            const ctx = voiceAudio.ctx;
+            const ab = ctx.createBuffer(1, n, 16000);
+            const ch = ab.getChannelData(0);
+            for (let i = 0; i < n; i++) ch[i] = pcm[i] / 0x8000;
+            const node = ctx.createBufferSource();
+            node.buffer = ab;
+            node.connect(ctx.destination);
+            const now = ctx.currentTime;
+            // Schedule gaplessly, but keep latency bounded.
+            let t = Math.max(now + 0.02, voiceAudio.playNext || now);
+            if (t - now > 0.6) t = now + 0.02;
+            try { node.start(t); } catch(e) { return; }
+            voiceAudio.playNext = t + ab.duration;
+        }
+
+        function handleVoiceState(msg) {
+            if (!msg || msg.type !== 'voice_state' || !msg.members) return;
+            const list = document.getElementById('voice-members');
+            if (!list) return;
+            list.innerHTML = '';
+            msg.members.forEach(m => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;gap:8px;background:var(--input-bg);border-radius:8px;padding:6px 10px;font-size:13px;' +
+                    (m.speaking ? 'border:2px solid var(--accent-green);' : '');
+                const av = document.createElement('span');
+                av.style.fontSize = '18px';
+                av.innerText = m.emoji || '?';
+                const nm = document.createElement('span');
+                nm.style.flex = '1';
+                nm.innerText = m.name + (m.kind === 'host' ? ' (host)' : m.kind === 'temp' ? ' (guest)' : '');
+                const st = document.createElement('span');
+                st.style.cssText = 'color:var(--accent-green);font-size:11px;';
+                st.innerText = m.speaking ? 'speaking' : (m.mutedByHost ? 'muted' : '');
+                row.appendChild(av);
+                row.appendChild(nm);
+                row.appendChild(st);
+                list.appendChild(row);
+            });
+        }
+
+        function startVoiceStatusPoll() {
+            stopVoiceStatusPoll();
+            voiceStatusTimer = setInterval(async () => {
+                try {
+                    const res = await fetch('/api/voice/status');
+                    const d = await res.json();
+                    if (d.approved) {
+                        stopVoiceStatusPoll();
+                        voicePanelState = 'joined';
+                        updateVoicePanel();
+                    }
+                } catch(e) {}
+            }, 2000);
+        }
+        function stopVoiceStatusPoll() {
+            if (voiceStatusTimer) { clearInterval(voiceStatusTimer); voiceStatusTimer = null; }
         }
 
         async function handleSendChat(e) {

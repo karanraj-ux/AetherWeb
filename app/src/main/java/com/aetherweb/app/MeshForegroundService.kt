@@ -122,6 +122,8 @@ object MeshNetworkManager {
                 }
             },
             isApproved = { ip -> _uiState.value.approvedSpectators.contains(ip) },
+            // Voice Room Phase 3: gate for the /ws-voice SFU.
+            isVoiceApproved = { ip -> _uiState.value.approvedVoiceGuests.contains(ip) },
             getChatHistory = {
                 _uiState.value.messages.takeLast(50).map { Pair(it.senderName, it.message) }
             },

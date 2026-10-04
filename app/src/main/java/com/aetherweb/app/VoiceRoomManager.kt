@@ -42,6 +42,12 @@ object VoiceRoomManager {
     private val _state = MutableStateFlow(VoiceRoomState())
     val state: StateFlow<VoiceRoomState> = _state.asStateFlow()
 
+    /**
+     * Phase 3/4: the live audio pipe (VoiceRoomClient). Set when the client connects;
+     * null when the dashboard is UI-only. All control calls below delegate to it.
+     */
+    var audioClient: VoiceRoomClient? = null
+
     /** Host (hotspot phone) starts the room. */
     fun openAsHost(hostId: String, hostName: String) {
         _state.update {
@@ -76,17 +82,20 @@ object VoiceRoomManager {
         }
     }
 
-    // --- Self controls ---
+    // --- Self controls (delegate to the audio pipe when connected) ---
     fun setSelfMic(on: Boolean) {
         updateSelf { it.copy(micOn = on && !it.mutedByHost) }
+        try { audioClient?.setMicOn(on) } catch (e: Exception) { /* UI-only mode */ }
     }
 
     fun setMutedByMe(id: String, muted: Boolean) {
         updateMember(id) { it.copy(mutedByMe = muted) }
+        try { audioClient?.setMutedByMe(id, muted) } catch (e: Exception) { /* UI-only mode */ }
     }
 
     fun setDeafen(deaf: Boolean) {
         _state.update { it.copy(deafen = deaf) }
+        try { audioClient?.setDeafen(deaf) } catch (e: Exception) { /* UI-only mode */ }
     }
 
     fun setSpeaking(id: String, speaking: Boolean) {

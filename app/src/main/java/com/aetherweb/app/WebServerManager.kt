@@ -37,6 +37,8 @@ import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.sync.withPermit
 
 import kotlinx.coroutines.flow.*
@@ -61,7 +63,9 @@ class WebServerManager(
     private val onMessageReceived: (String, String) -> Unit,
     // Voice Room Phase 1: profile enrichment + voice-join requests from web guests.
     private val onProfileUpdated: (SpectatorRequest) -> Unit = {},
-    private val onVoiceJoinRequested: (SpectatorRequest) -> Unit = {}
+    private val onVoiceJoinRequested: (SpectatorRequest) -> Unit = {},
+    // Voice Room Phase 3: voice-approval gate for the /ws-voice SFU.
+    private val isVoiceApproved: (String) -> Boolean = { false }
 ) {
     private var server: io.ktor.server.engine.EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
@@ -70,6 +74,115 @@ class WebServerManager(
     private val newMessagesFlow = MutableSharedFlow<WebMessage>(extraBufferCapacity = 100)
 
     private val downloadSemaphore = kotlinx.coroutines.sync.Semaphore(2)
+
+    // ------------------------------------------------------------------
+    // Voice Room Phase 3: host-side SFU (Selective Forwarding Unit).
+    //
+    // Binary audio frame format (all multi-byte fields little-endian):
+    //   byte 0      : frame type (0x01 = PCM audio)
+    //   byte 1      : senderId length N (0..255)
+    //   bytes 2..N+1: senderId UTF-8
+    //   rest        : PCM16 mono 16kHz audio payload (20ms = 640 bytes typical)
+    //
+    // Text frames are JSON control: {"type":"join"|"leave", ...} and the
+    // server broadcasts {"type":"voice_state","members":[...]} (debounced).
+    // WiFi-only by design — voice never touches BLE.
+    // ------------------------------------------------------------------
+    private data class VoiceSession(
+        val ip: String,
+        val senderId: String,
+        var name: String,
+        var emoji: String,
+        var kind: String, // "host" | "member" | "temp"
+        val session: io.ktor.websocket.WebSocketServerSession,
+        @Volatile var lastFrameAt: Long = 0L,
+        @Volatile var speaking: Boolean = false,
+        @Volatile var micOn: Boolean = false
+    )
+
+    private val voiceSessions = java.util.concurrent.ConcurrentHashMap<String, VoiceSession>()
+    private val voiceMutedIps = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+    private val voiceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var lastVoiceStateBroadcast = 0L
+
+    companion object {
+        const val VOICE_FRAME_TYPE_AUDIO: Byte = 0x01
+        const val VOICE_VAD_THRESHOLD = 600 // PCM RMS energy for "speaking"
+        const val VOICE_STATE_DEBOUNCE_MS = 300L
+        const val VOICE_SPEAKING_TIMEOUT_MS = 700L
+    }
+
+    /** Phase 4 hook: host mutes/unmutes a guest (server drops their frames). */
+    fun setVoiceMemberMuted(ip: String, muted: Boolean) {
+        if (muted) voiceMutedIps.add(ip) else voiceMutedIps.remove(ip)
+        voiceScope.launch { broadcastVoiceState(force = true) }
+    }
+
+    /** Phase 4 hook: host kicks a guest from voice (their socket is closed). */
+    fun kickVoiceMember(ip: String) {
+        val doomed = voiceSessions.values.filter { it.ip == ip }
+        voiceScope.launch {
+            doomed.forEach { sess ->
+                voiceSessions.remove(sess.senderId, sess)
+                try {
+                    sess.session.close(
+                        io.ktor.websocket.CloseReason(
+                            io.ktor.websocket.CloseReason.Codes.VIOLATED_POLICY, "Kicked by host"
+                        )
+                    )
+                } catch (e: Exception) { /* already gone */ }
+            }
+            broadcastVoiceState(force = true)
+        }
+    }
+
+    fun isVoiceMemberMuted(ip: String): Boolean = voiceMutedIps.contains(ip)
+
+    private fun pcmRms(pcm: ByteArray): Int {
+        if (pcm.size < 2) return 0
+        var sum = 0L
+        var n = 0
+        var i = 0
+        while (i + 1 < pcm.size) {
+            val s = (pcm[i].toInt() and 0xFF) or (pcm[i + 1].toInt() shl 8)
+            sum += (s * s).toLong()
+            n++
+            i += 2
+        }
+        return if (n == 0) 0 else kotlin.math.sqrt(sum.toDouble() / n).toInt()
+    }
+
+    private suspend fun broadcastVoiceState(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        voiceSessions.values.forEach { sess ->
+            if (sess.speaking && now - sess.lastFrameAt > VOICE_SPEAKING_TIMEOUT_MS) {
+                sess.speaking = false
+            }
+        }
+        if (!force && now - lastVoiceStateBroadcast < VOICE_STATE_DEBOUNCE_MS) return
+        lastVoiceStateBroadcast = now
+        val arr = org.json.JSONArray()
+        voiceSessions.values.forEach { sess ->
+            arr.put(org.json.JSONObject().apply {
+                put("id", sess.senderId)
+                put("name", sess.name)
+                put("emoji", sess.emoji)
+                put("kind", sess.kind)
+                put("speaking", sess.speaking)
+                put("micOn", sess.micOn)
+                put("mutedByHost", voiceMutedIps.contains(sess.ip))
+            })
+        }
+        val msg = org.json.JSONObject().apply {
+            put("type", "voice_state")
+            put("members", arr)
+        }.toString()
+        voiceSessions.values.forEach { sess ->
+            try {
+                sess.session.send(io.ktor.websocket.Frame.Text(msg))
+            } catch (e: Exception) { /* drop dead sessions on next frame */ }
+        }
+    }
 
     var sharedClipboardText: String = ""
         private set
@@ -321,6 +434,104 @@ class WebServerManager(
                             call.respondText("{\"ok\":true}", io.ktor.http.ContentType.Application.Json)
                         } catch (e: Exception) {
                             call.respondText("{\"ok\":false}", io.ktor.http.ContentType.Application.Json, io.ktor.http.HttpStatusCode.BadRequest)
+                        }
+                    }
+                    // Voice Room Phase 3: polled by web guests waiting for voice approval.
+                    get("/api/voice/status") {
+                        try {
+                            val ip = call.request.local.remoteHost
+                            val obj = org.json.JSONObject().apply {
+                                put("approved", isVoiceApproved(ip))
+                                put("inRoom", voiceSessions.values.any { it.ip == ip })
+                                put("count", voiceSessions.size)
+                            }
+                            call.respondText(obj.toString(), io.ktor.http.ContentType.Application.Json)
+                        } catch (e: Exception) {
+                            call.respondText("{\"approved\":false}", io.ktor.http.ContentType.Application.Json)
+                        }
+                    }
+                    // Voice Room Phase 3: the SFU. Host forwards (never mixes) 16kHz PCM16
+                    // frames between voice-approved members. App peers and web guests use the
+                    // same socket; the host phone itself connects as a client to 127.0.0.1.
+                    webSocket("/ws-voice") {
+                        val ip = call.request.local.remoteHost
+                        val isSelf = ip == "127.0.0.1" || ip == "::1"
+                        if (!isSelf && (!isApproved(ip) || !isVoiceApproved(ip))) {
+                            close(
+                                io.ktor.websocket.CloseReason(
+                                    io.ktor.websocket.CloseReason.Codes.VIOLATED_POLICY,
+                                    "Voice not approved"
+                                )
+                            )
+                            return@webSocket
+                        }
+                        val params = call.request.queryParameters
+                        val senderId = (params["pid"] ?: params["sender"] ?: ip).take(64)
+                        val sess = VoiceSession(
+                            ip = ip,
+                            senderId = senderId,
+                            name = (params["sender"] ?: "Guest").take(32),
+                            emoji = (params["emoji"] ?: "").take(8),
+                            kind = (params["kind"] ?: if (isSelf) "host" else "temp").take(8),
+                            session = this
+                        )
+                        voiceSessions[senderId] = sess
+                        android.util.Log.d("WebServer", "Voice member joined: ${sess.name} ($senderId)")
+                        try {
+                            broadcastVoiceState(force = true)
+                            for (frame in incoming) {
+                                when (frame) {
+                                    is io.ktor.websocket.Frame.Text -> {
+                                        try {
+                                            val obj = org.json.JSONObject(frame.readText())
+                                            when (obj.optString("type")) {
+                                                "join" -> {
+                                                    sess.name = obj.optString("name", sess.name).take(32)
+                                                    sess.emoji = obj.optString("emoji", sess.emoji).take(8)
+                                                    broadcastVoiceState(force = true)
+                                                }
+                                                "leave" -> {
+                                                    voiceSessions.remove(senderId, sess)
+                                                    broadcastVoiceState(force = true)
+                                                }
+                                                "mic" -> {
+                                                    sess.micOn = obj.optBoolean("on", false)
+                                                    broadcastVoiceState(force = true)
+                                                }
+                                            }
+                                        } catch (e: Exception) { /* ignore malformed control */ }
+                                    }
+                                    is io.ktor.websocket.Frame.Binary -> {
+                                        val data = frame.readBytes()
+                                        if (data.size < 3 || data[0] != VOICE_FRAME_TYPE_AUDIO) continue
+                                        val idLen = data[1].toInt() and 0xFF
+                                        if (data.size < 2 + idLen) continue
+                                        val fromId = String(data, 2, idLen, Charsets.UTF_8)
+                                        if (fromId != sess.senderId) continue // anti-spoof
+                                        if (voiceMutedIps.contains(sess.ip)) continue // host mute
+                                        val pcm = data.copyOfRange(2 + idLen, data.size)
+                                        sess.lastFrameAt = System.currentTimeMillis()
+                                        sess.speaking = pcmRms(pcm) > VOICE_VAD_THRESHOLD
+                                        // Selective forwarding: everyone except the sender.
+                                        voiceSessions.values.forEach { target ->
+                                            if (target.senderId != sess.senderId) {
+                                                try {
+                                                    target.session.send(
+                                                        io.ktor.websocket.Frame.Binary(true, data)
+                                                    )
+                                                } catch (e: Exception) { /* dead session */ }
+                                            }
+                                        }
+                                        broadcastVoiceState()
+                                    }
+                                    else -> { /* ping/pong handled by Ktor */ }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.d("WebServer", "Voice session ended: $senderId")
+                        } finally {
+                            voiceSessions.remove(senderId, sess)
+                            voiceScope.launch { broadcastVoiceState(force = true) }
                         }
                     }
                     get("/api/files") {
