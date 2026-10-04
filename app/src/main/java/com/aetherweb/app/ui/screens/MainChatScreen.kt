@@ -145,7 +145,8 @@ fun MainChatScreen(
         VoiceRoomSheet(
             onDismiss = { showVoiceRoomSheet = false },
             canHost = uiState.isHotspotActive,
-            hostName = uiState.localUserName
+            hostName = uiState.localUserName,
+            peerId = com.aetherweb.app.MeshNetworkManager.localNodeId
         )
     }
 

@@ -63,10 +63,6 @@ object VoiceRoomManager {
         }
     }
 
-    fun closeRoom() {
-        _state.value = VoiceRoomState()
-    }
-
     fun upsertMember(member: VoiceMember) {
         _state.update { it.copy(members = it.members + (member.id to member)) }
     }
@@ -102,9 +98,19 @@ object VoiceRoomManager {
         updateMember(id) { it.copy(speaking = speaking) }
     }
 
-    // --- Host controls (server-side enforcement lands in Phase 4) ---
+    // --- Host controls (Phase 4: local state + server-side enforcement) ---
     fun hostSetMute(id: String, muted: Boolean) {
         updateMember(id) { it.copy(mutedByHost = muted, micOn = if (muted) false else it.micOn) }
+        try {
+            MeshNetworkManager.webServerManager?.setVoiceMemberMutedById(id, muted)
+        } catch (e: Exception) { /* UI-only mode */ }
+    }
+
+    fun kickMember(id: String) {
+        removeMember(id)
+        try {
+            MeshNetworkManager.webServerManager?.kickVoiceMemberById(id)
+        } catch (e: Exception) { /* UI-only mode */ }
     }
 
     fun hostMuteAll() {
@@ -114,6 +120,33 @@ object VoiceRoomManager {
                 else m.copy(mutedByHost = true, micOn = false)
             })
         }
+        try {
+            val server = MeshNetworkManager.webServerManager
+            _state.value.members.values
+                .filter { !it.isSelf && it.kind != "host" }
+                .forEach { server?.setVoiceMemberMutedById(it.id, true) }
+        } catch (e: Exception) { /* UI-only mode */ }
+    }
+
+    /** Phase 4: tear down the audio pipe when the room closes. */
+    fun closeRoom() {
+        try { audioClient?.disconnect() } catch (e: Exception) { /* ignore */ }
+        audioClient = null
+        _state.value = VoiceRoomState()
+    }
+
+    /** Phase 4: app peer (non-host) marks the room live once voice_state arrives. */
+    fun markActiveAsGuest() {
+        _state.update { if (it.active) it else it.copy(active = true, isHost = false) }
+    }
+
+    /**
+     * Phase 4: attach a connected audio pipe. Host calls this after openAsHost;
+     * app peers call it after joining.
+     */
+    fun attachAudioClient(client: VoiceRoomClient) {
+        try { audioClient?.disconnect() } catch (e: Exception) { /* ignore */ }
+        audioClient = client
     }
 
     private fun updateSelf(transform: (VoiceMember) -> VoiceMember) {

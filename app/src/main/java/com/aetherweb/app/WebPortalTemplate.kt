@@ -553,6 +553,7 @@ object WebPortalTemplate {
             <div id="voice-https-warning" style="display:none;background:#7a4a00;color:#ffe0b2;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px;"></div>
             <button id="voice-join-btn" onclick="requestVoiceJoin()" class="action-btn green" style="width:100%;justify-content:center;padding:10px;margin-bottom:8px;">Join Voice Room</button>
             <button id="voice-mic-btn" onclick="toggleVoiceMic()" class="action-btn" style="display:none;width:100%;justify-content:center;padding:10px;margin-bottom:8px;">Mic Off</button>
+            <button id="voice-deafen-btn" onclick="toggleVoiceDeafen()" class="action-btn" style="display:none;width:100%;justify-content:center;padding:10px;margin-bottom:8px;">Deafen</button>
             <div id="voice-members" style="display:flex;flex-direction:column;gap:6px;"></div>
         </div>
     </div>
@@ -944,18 +945,22 @@ object WebPortalTemplate {
             }
             const joinBtn = document.getElementById('voice-join-btn');
             const micBtn = document.getElementById('voice-mic-btn');
+            const deafBtn = document.getElementById('voice-deafen-btn');
             const status = document.getElementById('voice-panel-status');
             if (voicePanelState === 'idle') {
                 joinBtn.style.display = 'block';
                 micBtn.style.display = 'none';
+                deafBtn.style.display = 'none';
                 status.innerText = 'A live voice channel for everyone in this room.';
             } else if (voicePanelState === 'requested') {
                 joinBtn.style.display = 'none';
                 micBtn.style.display = 'none';
+                deafBtn.style.display = 'none';
                 status.innerText = 'Request sent — waiting for the host to allow voice...';
             } else {
                 joinBtn.style.display = 'none';
                 micBtn.style.display = 'block';
+                deafBtn.style.display = 'block';
                 status.innerText = 'You are in the voice room.';
             }
         }
@@ -1099,8 +1104,24 @@ object WebPortalTemplate {
             return true;
         }
 
-        function playVoiceFrame(buf) {
+        // Voice Room Phase 4: client-side deafen + per-member mute-for-me.
+        let voiceDeafened = false;
+        let lastVoiceMembers = [];
+        function toggleVoiceDeafen() {
+            voiceDeafened = !voiceDeafened;
+            const b = document.getElementById('voice-deafen-btn');
+            b.innerText = voiceDeafened ? 'Undeafen' : 'Deafen';
+            b.classList.toggle('green', voiceDeafened);
+        }
+        function toggleVoiceMemberMute(id) {
             if (!voiceAudio) return;
+            if (voiceAudio.mutedByMe.has(id)) voiceAudio.mutedByMe.delete(id);
+            else voiceAudio.mutedByMe.add(id);
+            handleVoiceState({ type: 'voice_state', members: lastVoiceMembers });
+        }
+
+        function playVoiceFrame(buf) {
+            if (!voiceAudio || voiceDeafened) return;
             const u8 = new Uint8Array(buf);
             if (u8.length < 3 || u8[0] !== 1) return;
             const idLen = u8[1];
@@ -1128,8 +1149,21 @@ object WebPortalTemplate {
 
         function handleVoiceState(msg) {
             if (!msg || msg.type !== 'voice_state' || !msg.members) return;
+            lastVoiceMembers = msg.members;
             const list = document.getElementById('voice-members');
             if (!list) return;
+            // Phase 4: if the host muted me, lock my mic button.
+            const me = msg.members.find(m => m.id === myProfile.pid);
+            const micBtn = document.getElementById('voice-mic-btn');
+            if (me && me.mutedByHost) {
+                if (voiceAudio) stopVoiceMic();
+                micBtn.innerText = 'Muted by host';
+                micBtn.classList.remove('green');
+                micBtn.disabled = true;
+            } else if (micBtn.disabled) {
+                micBtn.disabled = false;
+                micBtn.innerText = 'Mic Off';
+            }
             list.innerHTML = '';
             msg.members.forEach(m => {
                 const row = document.createElement('div');
@@ -1147,6 +1181,15 @@ object WebPortalTemplate {
                 row.appendChild(av);
                 row.appendChild(nm);
                 row.appendChild(st);
+                // Phase 4: mute anyone for me (client-side frame dropping).
+                if (m.id !== myProfile.pid) {
+                    const muteBtn = document.createElement('button');
+                    const isMuted = voiceAudio && voiceAudio.mutedByMe.has(m.id);
+                    muteBtn.innerText = isMuted ? 'unmute' : 'mute';
+                    muteBtn.style.cssText = 'background:var(--card-bg);border:1px solid var(--border-color);color:var(--text-primary);border-radius:6px;font-size:11px;padding:2px 8px;cursor:pointer;';
+                    muteBtn.onclick = (function(id) { return function() { toggleVoiceMemberMute(id); }; })(m.id);
+                    row.appendChild(muteBtn);
+                }
                 list.appendChild(row);
             });
         }

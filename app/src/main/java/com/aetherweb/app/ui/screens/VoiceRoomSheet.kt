@@ -33,6 +33,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -40,9 +42,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.aetherweb.app.VoiceMember
+import com.aetherweb.app.VoiceRoomClient
 import com.aetherweb.app.VoiceRoomManager
 
 /**
@@ -55,10 +60,19 @@ import com.aetherweb.app.VoiceRoomManager
 fun VoiceRoomSheet(
     onDismiss: () -> Unit,
     canHost: Boolean,
-    hostName: String
+    hostName: String,
+    peerId: String
 ) {
+    val context = LocalContext.current
     val roomState by VoiceRoomManager.state.collectAsState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Voice Room Phase 4: runtime mic permission (same pattern as CallScreen).
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) VoiceRoomManager.setSelfMic(true)
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -107,7 +121,14 @@ fun VoiceRoomSheet(
                 Spacer(modifier = Modifier.height(12.dp))
                 if (canHost) {
                     Button(
-                        onClick = { VoiceRoomManager.openAsHost("host-self", hostName) },
+                        onClick = {
+                            // Phase 4: host starts the room AND joins its own SFU as a client,
+                            // so the forwarding path treats everyone uniformly.
+                            VoiceRoomManager.openAsHost("host-self", hostName)
+                            val client = VoiceRoomClient(context)
+                            client.connect("127.0.0.1", "host-self", hostName, "", "host")
+                            VoiceRoomManager.attachAudioClient(client)
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
                     ) {
                         Icon(Icons.Default.Mic, contentDescription = null, tint = Color.White)
@@ -115,8 +136,28 @@ fun VoiceRoomSheet(
                         Text("Start Voice Room", color = Color.White)
                     }
                 } else {
+                    // Phase 4: app peer joins the host's room via the hotspot gateway.
+                    val joined = roomState.members.values.any { it.isSelf }
+                    if (!joined) {
+                        Button(
+                            onClick = {
+                                val client = VoiceRoomClient(context)
+                                client.connect(
+                                    VoiceRoomClient.guessHostIp(), peerId, hostName, "", "member"
+                                )
+                                VoiceRoomManager.attachAudioClient(client)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
+                        ) {
+                            Icon(Icons.Default.Mic, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Join Voice Room", color = Color.White)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                     Text(
-                        text = "Voice room is hosted by the hotspot phone. Start the hotspot to host.",
+                        text = if (joined) "Connected to the voice room."
+                        else "Voice room is hosted by the hotspot phone. Join when the host starts it.",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFF8696A0)
                     )
@@ -132,7 +173,17 @@ fun VoiceRoomSheet(
                     val micOn = self?.micOn == true
                     val locked = self?.mutedByHost == true
                     Button(
-                        onClick = { VoiceRoomManager.setSelfMic(!micOn) },
+                        onClick = {
+                            // Phase 4: request runtime mic permission like calls do.
+                            if (!micOn && ContextCompat.checkSelfPermission(
+                                    context, android.Manifest.permission.RECORD_AUDIO
+                                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                            ) {
+                                micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                            } else {
+                                VoiceRoomManager.setSelfMic(!micOn)
+                            }
+                        },
                         enabled = !locked,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (micOn) Color(0xFF25D366) else Color(0xFF374045)
@@ -176,6 +227,11 @@ fun VoiceRoomSheet(
                     Spacer(modifier = Modifier.height(4.dp))
                     TextButton(onClick = { VoiceRoomManager.closeRoom() }) {
                         Text("End voice room", color = Color(0xFFEF5350))
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    TextButton(onClick = { VoiceRoomManager.closeRoom() }) {
+                        Text("Leave voice room", color = Color(0xFFEF5350))
                     }
                 }
             }
@@ -259,7 +315,7 @@ private fun VoiceMemberRow(member: VoiceMember, isHost: Boolean) {
                     tint = if (member.mutedByHost) Color(0xFFFFB74D) else Color(0xFFE9EDEF)
                 )
             }
-            IconButton(onClick = { VoiceRoomManager.removeMember(member.id) }) {
+            IconButton(onClick = { VoiceRoomManager.kickMember(member.id) }) {
                 Icon(Icons.Default.Close, contentDescription = "Kick", tint = Color(0xFFEF5350))
             }
         }

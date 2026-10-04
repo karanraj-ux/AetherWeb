@@ -48,6 +48,19 @@ class VoiceRoomClient(private val context: Context) {
         const val FRAME_TYPE_AUDIO: Byte = 0x01
         const val VAD_THRESHOLD = 600 // PCM RMS energy
         const val VAD_HANGOVER_FRAMES = 25 // ~500ms
+
+        /**
+         * Phase 4: best-effort host IP for app peers. On an Android hotspot the
+         * gateway is the host's IP (usually x.x.x.1); derive it from our own.
+         */
+        fun guessHostIp(): String {
+            return try {
+                val own = NetworkUtils.getLocalIpAddress()
+                if (own.contains(".")) own.substringBeforeLast(".") + ".1" else "192.168.49.1"
+            } catch (e: Exception) {
+                "192.168.49.1"
+            }
+        }
     }
 
     private var ws: WebSocket? = null
@@ -189,6 +202,7 @@ class VoiceRoomClient(private val context: Context) {
     private fun applyVoiceState(members: org.json.JSONArray?) {
         if (members == null) return
         try {
+            VoiceRoomManager.markActiveAsGuest()
             val seen = mutableSetOf<String>()
             for (i in 0 until members.length()) {
                 val o = members.getJSONObject(i)

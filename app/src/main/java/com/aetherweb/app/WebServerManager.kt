@@ -138,6 +138,16 @@ class WebServerManager(
 
     fun isVoiceMemberMuted(ip: String): Boolean = voiceMutedIps.contains(ip)
 
+    /** Phase 4: host mutes by member id (dashboard key) instead of raw IP. */
+    fun setVoiceMemberMutedById(senderId: String, muted: Boolean) {
+        voiceSessions[senderId]?.let { setVoiceMemberMuted(it.ip, muted) }
+    }
+
+    /** Phase 4: host kicks by member id. */
+    fun kickVoiceMemberById(senderId: String) {
+        voiceSessions[senderId]?.let { kickVoiceMember(it.ip) }
+    }
+
     private fun pcmRms(pcm: ByteArray): Int {
         if (pcm.size < 2) return 0
         var sum = 0L
