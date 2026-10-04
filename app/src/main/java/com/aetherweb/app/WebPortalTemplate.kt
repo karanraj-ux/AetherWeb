@@ -323,14 +323,25 @@ object WebPortalTemplate {
 </head>
 <body>
     <div id="drop-overlay">
-        <span>📂 Drop files to share instantly over offline mesh</span>
+        <span>Drop files to share instantly over offline mesh 📂</span>
+    </div>
+
+    <!-- Voice Room Phase 1: temp guest profile modal -->
+    <div id="profile-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:var(--card-bg);border-radius:12px;padding:20px;width:300px;text-align:center;">
+            <div style="font-weight:bold;font-size:16px;margin-bottom:4px;">Your Guest Profile</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">The host sees this when you request access.</div>
+            <div id="portal-emoji-row" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:12px;"></div>
+            <input id="portal-pname" maxlength="24" placeholder="Your name" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border-color);background:var(--input-bg);color:var(--text-primary);font-size:15px;box-sizing:border-box;margin-bottom:12px;">
+            <button onclick="savePortalProfile()" style="background:var(--accent-green);color:#fff;border:none;border-radius:8px;padding:10px 24px;font-weight:bold;font-size:15px;cursor:pointer;">Save Profile</button>
+        </div>
     </div>
 
     <div id="app-container">
         <!-- Top Persistent Header -->
         <header id="top-header">
             <div class="header-title-box">
-                <div class="header-avatar" id="header-avatar-icon">💬</div>
+                <div class="header-avatar" id="header-avatar-icon" onclick="openProfileModal()" title="Edit guest profile" style="cursor:pointer;">💬</div>
                 <div class="header-text">
                     <span class="header-room" id="header-page-title">MeshChat Room</span>
                     <span class="header-status" id="header-mesh-status">🟢 Online (Offline Mesh AP)</span>
@@ -532,12 +543,59 @@ object WebPortalTemplate {
 
     <!-- Client Script (Persistent WebSocket + Navigation Engine) -->
     <script>
-        let myName = localStorage.getItem('mesh_name');
-        if (!myName) {
-            myName = 'Web-' + Math.floor(100 + Math.random() * 900);
-            localStorage.setItem('mesh_name', myName);
+        // Voice Room Phase 1: temp guest profile (name + emoji + stable pid).
+        let myProfile = { name: '', emoji: '\ud83d\udca7', pid: '' };
+        try {
+            const rawProfile = localStorage.getItem('aether_profile');
+            if (rawProfile) myProfile = JSON.parse(rawProfile);
+        } catch(e) {}
+        if (!myProfile.pid) {
+            myProfile.pid = localStorage.getItem('aether_pid') || ('web-' + Math.random().toString(36).slice(2, 10));
+            try { localStorage.setItem('aether_pid', myProfile.pid); } catch(e) {}
         }
+        if (!myProfile.name) {
+            const legacyName = localStorage.getItem('mesh_name');
+            myProfile.name = legacyName || ('Web-' + Math.floor(100 + Math.random() * 900));
+        }
+        let myName = myProfile.name;
+        let myEmoji = myProfile.emoji || '\ud83d\udca7';
+        function persistProfile() {
+            try { localStorage.setItem('aether_profile', JSON.stringify({ name: myName, emoji: myEmoji, pid: myProfile.pid })); } catch(e) {}
+        }
+        persistProfile();
         document.getElementById('diag-my-name').innerText = myName;
+
+        // Temp profile editor modal.
+        const PORTAL_EMOJIS = ['\ud83d\ude00', '\ud83d\udca7', '\ud83d\udcae', '\ud83d\udcbb', '\ud83d\udcb5', '\u26bd', '\ud83d\ude80', '\ud83d\ude1f'];
+        let portalPickedEmoji = myEmoji;
+        function renderPortalEmojiRow() {
+            const row = document.getElementById('portal-emoji-row');
+            row.innerHTML = '';
+            PORTAL_EMOJIS.forEach(function(e) {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.innerText = e;
+                b.style.cssText = 'font-size:24px;background:var(--input-bg);border:2px solid ' + (e === portalPickedEmoji ? 'var(--accent-green)' : 'transparent') + ';border-radius:8px;padding:4px;cursor:pointer;';
+                b.onclick = function() { portalPickedEmoji = e; renderPortalEmojiRow(); };
+                row.appendChild(b);
+            });
+        }
+        function openProfileModal() {
+            document.getElementById('portal-pname').value = myName;
+            portalPickedEmoji = myEmoji;
+            renderPortalEmojiRow();
+            document.getElementById('profile-modal').style.display = 'flex';
+        }
+        function savePortalProfile() {
+            const v = document.getElementById('portal-pname').value.trim();
+            if (v) myName = v;
+            myEmoji = portalPickedEmoji;
+            persistProfile();
+            document.getElementById('diag-my-name').innerText = myName;
+            document.getElementById('profile-modal').style.display = 'none';
+            try { fetch('/api/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: myName, emoji: myEmoji, pid: myProfile.pid }) }); } catch(e) {}
+            connectWebSocket();
+        }
 
         // Navigation Engine (Seamless view switching - ZERO CONNECTION BREAK)
         function navigateTo(pageId) {
@@ -812,8 +870,9 @@ object WebPortalTemplate {
         let ws = null;
         function connectWebSocket() {
             if (!window.WebSocket) return;
+            try { if (ws && ws.readyState !== WebSocket.CLOSED) ws.close(); } catch(e) {}
             const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const url = proto + '//' + window.location.host + '/ws?sender=' + encodeURIComponent(myName);
+            const url = proto + '//' + window.location.host + '/ws?sender=' + encodeURIComponent(myName) + '&emoji=' + encodeURIComponent(myEmoji) + '&pid=' + encodeURIComponent(myProfile.pid);
             ws = new WebSocket(url);
             ws.onopen = () => {
                 document.getElementById('diag-ws-status').innerText = 'Active (Connected)';
@@ -846,6 +905,9 @@ object WebPortalTemplate {
             };
         }
         connectWebSocket();
+
+        // Voice Room Phase 1: first visit -> force temp-profile setup.
+        try { if (!localStorage.getItem('aether_profile')) openProfileModal(); } catch(e) {}
 
         async function handleSendChat(e) {
             e.preventDefault();

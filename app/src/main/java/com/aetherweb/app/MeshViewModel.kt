@@ -104,8 +104,11 @@ data class MeshState(
     val ticTacToeState: com.aetherweb.app.TicTacToeState = com.aetherweb.app.TicTacToeState(),
     val connect4State: com.aetherweb.app.Connect4State = com.aetherweb.app.Connect4State(),
     val chessState: ChessState = ChessState(),
-    val pendingSpectators: List<String> = emptyList(),
+    val pendingSpectators: List<SpectatorRequest> = emptyList(),
     val approvedSpectators: List<String> = emptyList(),
+    // Voice Room Phase 1: named voice-join requests + voice-approved guest IPs.
+    val pendingVoiceRequests: List<SpectatorRequest> = emptyList(),
+    val approvedVoiceGuests: List<String> = emptyList(),
     val pendingUsers: List<PendingUser> = emptyList(),
     val activeDmPeerId: String? = null, // null = Public Mesh Room, or peer ID for 1-1 Private DM
     val activeSOSAlert: SOSBeaconAlert? = null,
@@ -1271,13 +1274,44 @@ class MeshViewModel(application: Application) : AndroidViewModel(application) {
 
     fun approveSpectator(id: String) {
         MeshNetworkManager._uiState.update { it.copy(
-            pendingSpectators = it.pendingSpectators.filter { p -> p != id },
+            pendingSpectators = it.pendingSpectators.filter { p -> p.ip != id },
             approvedSpectators = it.approvedSpectators + id
         )}
     }
     fun rejectSpectator(id: String) {
         MeshNetworkManager._uiState.update { it.copy(
-            pendingSpectators = it.pendingSpectators.filter { p -> p != id }
+            pendingSpectators = it.pendingSpectators.filter { p -> p.ip != id }
+        )}
+    }
+
+    // Voice Room Phase 1: profile enrichment + named voice approvals.
+    fun updateSpectatorProfile(req: SpectatorRequest) {
+        MeshNetworkManager._uiState.update { state ->
+            fun enrich(list: List<SpectatorRequest>) = list.map { if (it.ip == req.ip) req.copy(request = it.request) else it }
+            state.copy(
+                pendingSpectators = enrich(state.pendingSpectators),
+                pendingVoiceRequests = enrich(state.pendingVoiceRequests)
+            )
+        }
+    }
+    fun requestVoiceAccess(req: SpectatorRequest) {
+        MeshNetworkManager._uiState.update { state ->
+            val already = state.approvedVoiceGuests.contains(req.ip) ||
+                state.pendingVoiceRequests.any { it.ip == req.ip }
+            if (already) state else state.copy(
+                pendingVoiceRequests = state.pendingVoiceRequests + req.copy(request = "voice")
+            )
+        }
+    }
+    fun approveVoiceGuest(id: String) {
+        MeshNetworkManager._uiState.update { it.copy(
+            pendingVoiceRequests = it.pendingVoiceRequests.filter { p -> p.ip != id },
+            approvedVoiceGuests = it.approvedVoiceGuests + id
+        )}
+    }
+    fun rejectVoiceGuest(id: String) {
+        MeshNetworkManager._uiState.update { it.copy(
+            pendingVoiceRequests = it.pendingVoiceRequests.filter { p -> p.ip != id }
         )}
     }
 

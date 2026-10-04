@@ -58,7 +58,10 @@ class WebServerManager(
     private val onClientConnected: (String) -> Unit = {},
     private val isApproved: (String) -> Boolean = { true },
     private val getChatHistory: () -> List<Pair<String, String>> = { emptyList() },
-    private val onMessageReceived: (String, String) -> Unit
+    private val onMessageReceived: (String, String) -> Unit,
+    // Voice Room Phase 1: profile enrichment + voice-join requests from web guests.
+    private val onProfileUpdated: (SpectatorRequest) -> Unit = {},
+    private val onVoiceJoinRequested: (SpectatorRequest) -> Unit = {}
 ) {
     private var server: io.ktor.server.engine.EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
@@ -234,9 +237,38 @@ class WebServerManager(
                             if (!isApproved(ip)) {
                                 call.respondText("""
                                     <!DOCTYPE html><html>
-                                    <head><title>Waiting for Approval</title><meta http-equiv="refresh" content="3"></head>
-                                    <body style="background:#222;color:white;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
-                                        <h1>Waiting for Host Approval...</h1>
+                                    <head><title>Waiting for Approval</title><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="refresh" content="30"></head>
+                                    <body style="background:#222;color:white;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;margin:0;">
+                                    <div style="text-align:center;max-width:340px;padding:20px;">
+                                    <h1 style="font-size:22px;">Waiting for Host Approval...</h1>
+                                    <p style="color:#aaa;font-size:14px;">Tell the host who you are so they recognize your request:</p>
+                                    <div id="emoji-row" style="display:flex;gap:6px;justify-content:center;margin:12px 0;flex-wrap:wrap;"></div>
+                                    <input id="pname" placeholder="Your name" maxlength="24" style="padding:10px;border-radius:8px;border:1px solid #555;background:#333;color:#fff;width:100%;font-size:15px;box-sizing:border-box;">
+                                    <button onclick="saveProfile()" style="margin-top:10px;padding:10px 24px;border-radius:8px;border:none;background:#25d366;color:#fff;font-weight:bold;font-size:15px;cursor:pointer;">Save &amp; Identify Me</button>
+                                    <p id="psaved" style="color:#25d366;font-size:13px;display:none;">Saved! The host can now see your name.</p>
+                                    </div>
+                                    <script>
+                                    var EMOJIS=['\uD83D\uDE00','\uD83D\uDCA7','\uD83D\uDCAE','\uD83D\uDCBB','\uD83D\uDCB5','\u26BD','\uD83D\uDE80','\uD83D\uDE1F'];
+                                    var picked=EMOJIS[1];
+                                    var pid=localStorage.getItem('aether_pid');
+                                    if(!pid){pid='web-'+Math.random().toString(36).slice(2,10);localStorage.setItem('aether_pid',pid);}
+                                    var row=document.getElementById('emoji-row');
+                                    EMOJIS.forEach(function(e){
+                                      var b=document.createElement('button');
+                                      b.innerText=e;
+                                      b.style.cssText='font-size:24px;background:#333;border:2px solid transparent;border-radius:8px;padding:4px;cursor:pointer;';
+                                      b.onclick=function(){picked=e;for(var i=0;i<row.children.length;i++){row.children[i].style.borderColor='transparent';}b.style.borderColor='#25d366';};
+                                      row.appendChild(b);
+                                    });
+                                    try{var sv=localStorage.getItem('aether_profile');if(sv){var p=JSON.parse(sv);document.getElementById('pname').value=p.name||'';if(p.emoji)picked=p.emoji;}}catch(err){}
+                                    function saveProfile(){
+                                      var name=document.getElementById('pname').value.trim()||'Web guest';
+                                      var prof={name:name,emoji:picked,pid:pid};
+                                      try{localStorage.setItem('aether_profile',JSON.stringify(prof));}catch(err){}
+                                      fetch('/api/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(prof)});
+                                      document.getElementById('psaved').style.display='block';
+                                    }
+                                    </script>
                                     </body></html>
                                 """, io.ktor.http.ContentType.Text.Html)
                                 return@get
@@ -253,6 +285,42 @@ class WebServerManager(
                         } catch (e: Exception) {
                             Log.e("WebServer", "Error in / route", e)
                             DiagnosticLogger.log("WebServer", "Error /", e.stackTraceToString().take(200), EventStatus.ERROR)
+                        }
+                    }
+                    // Voice Room Phase 1: web-guest profile + voice-join request.
+                    // Callable WITHOUT approval — this is how a guest identifies / asks.
+                    post("/api/profile") {
+                        try {
+                            val ip = call.request.local.remoteHost
+                            val obj = org.json.JSONObject(call.receiveText())
+                            val name = obj.optString("name", "Web guest").take(32).ifBlank { "Web guest" }
+                            val emoji = obj.optString("emoji", "").take(8)
+                            val pid = obj.optString("pid", ip).take(64).ifBlank { ip }
+                            onProfileUpdated(SpectatorRequest(ip = ip, name = name, emoji = emoji, pid = pid))
+                            call.respondText("{\"ok\":true}", io.ktor.http.ContentType.Application.Json)
+                        } catch (e: Exception) {
+                            call.respondText("{\"ok\":false}", io.ktor.http.ContentType.Application.Json, io.ktor.http.HttpStatusCode.BadRequest)
+                        }
+                    }
+                    post("/api/voice/request") {
+                        try {
+                            val ip = call.request.local.remoteHost
+                            if (!isApproved(ip)) {
+                                call.respondText(
+                                    "{\"ok\":false,\"reason\":\"not-approved\"}",
+                                    io.ktor.http.ContentType.Application.Json,
+                                    io.ktor.http.HttpStatusCode.Forbidden
+                                )
+                                return@post
+                            }
+                            val obj = org.json.JSONObject(call.receiveText())
+                            val name = obj.optString("name", "Web guest").take(32).ifBlank { "Web guest" }
+                            val emoji = obj.optString("emoji", "").take(8)
+                            val pid = obj.optString("pid", ip).take(64).ifBlank { ip }
+                            onVoiceJoinRequested(SpectatorRequest(ip = ip, name = name, emoji = emoji, pid = pid, request = "voice"))
+                            call.respondText("{\"ok\":true}", io.ktor.http.ContentType.Application.Json)
+                        } catch (e: Exception) {
+                            call.respondText("{\"ok\":false}", io.ktor.http.ContentType.Application.Json, io.ktor.http.HttpStatusCode.BadRequest)
                         }
                     }
                     get("/api/files") {

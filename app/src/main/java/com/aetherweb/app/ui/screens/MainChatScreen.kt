@@ -110,16 +110,32 @@ fun MainChatScreen(
     }
 
     if (uiState.pendingSpectators.isNotEmpty()) {
-        val spectatorId = uiState.pendingSpectators.first()
+        val req = uiState.pendingSpectators.first()
         AlertDialog(
-            onDismissRequest = { viewModel.rejectSpectator(spectatorId) },
-            title = { Text("Web Spectator Request") },
-            text = { Text("A web spectator ($spectatorId) wants to join the mesh.") },
+            onDismissRequest = { viewModel.rejectSpectator(req.ip) },
+            title = { Text("Web Guest Request") },
+            text = { Text(req.describe()) },
             confirmButton = {
-                TextButton(onClick = { viewModel.approveSpectator(spectatorId) }) { Text("Approve") }
+                TextButton(onClick = { viewModel.approveSpectator(req.ip) }) { Text("Approve") }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.rejectSpectator(spectatorId) }) { Text("Reject", color = Color.Red) }
+                TextButton(onClick = { viewModel.rejectSpectator(req.ip) }) { Text("Reject", color = Color.Red) }
+            }
+        )
+    }
+
+    // Voice Room Phase 1: named voice-join approval (profile attached, no raw IDs).
+    if (uiState.pendingVoiceRequests.isNotEmpty()) {
+        val req = uiState.pendingVoiceRequests.first()
+        AlertDialog(
+            onDismissRequest = { viewModel.rejectVoiceGuest(req.ip) },
+            title = { Text("Voice Room Request") },
+            text = { Text(req.describe()) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.approveVoiceGuest(req.ip) }) { Text("Allow Voice") }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.rejectVoiceGuest(req.ip) }) { Text("Deny", color = Color.Red) }
             }
         )
     }

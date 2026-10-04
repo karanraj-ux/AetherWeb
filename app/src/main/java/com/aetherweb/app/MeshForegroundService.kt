@@ -94,9 +94,31 @@ object MeshNetworkManager {
             onClientConnected = { ip ->
                 val state = _uiState.value
                 if (!state.approvedSpectators.contains(ip)) {
-                    if (!state.pendingSpectators.contains(ip)) {
-                        _uiState.value = state.copy(pendingSpectators = state.pendingSpectators + ip)
+                    if (state.pendingSpectators.none { it.ip == ip }) {
+                        // Voice Room Phase 1: request carries a temp profile (name filled in
+                        // later via POST /api/profile from the waiting page).
+                        _uiState.value = state.copy(pendingSpectators = state.pendingSpectators +
+                            SpectatorRequest(ip = ip, name = "Web guest", emoji = "\uD83C\uDF10", pid = ip))
                     }
+                }
+            },
+            onProfileUpdated = { req ->
+                _uiState.update { state ->
+                    fun enrich(list: List<SpectatorRequest>) =
+                        list.map { if (it.ip == req.ip) req.copy(request = it.request) else it }
+                    state.copy(
+                        pendingSpectators = enrich(state.pendingSpectators),
+                        pendingVoiceRequests = enrich(state.pendingVoiceRequests)
+                    )
+                }
+            },
+            onVoiceJoinRequested = { req ->
+                _uiState.update { state ->
+                    val already = state.approvedVoiceGuests.contains(req.ip) ||
+                        state.pendingVoiceRequests.any { it.ip == req.ip }
+                    if (already) state else state.copy(
+                        pendingVoiceRequests = state.pendingVoiceRequests + req.copy(request = "voice")
+                    )
                 }
             },
             isApproved = { ip -> _uiState.value.approvedSpectators.contains(ip) },
