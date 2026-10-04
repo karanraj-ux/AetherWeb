@@ -74,7 +74,7 @@ class VoiceRoomClient(private val context: Context) {
     private var playThread: Thread? = null
     private val playQueue = LinkedBlockingQueue<ByteArray>(64)
     private val mutedByMe = Collections.synchronizedSet(mutableSetOf<String>())
-    @Volatile var deafen = false
+    @Volatile private var deafened = false
 
     private var selfId = ""
     private var selfName = ""
@@ -126,7 +126,7 @@ class VoiceRoomClient(private val context: Context) {
             }
 
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                if (deafen) return
+                if (deafened) return
                 val data = bytes.toByteArray()
                 if (data.size < 3 || data[0] != FRAME_TYPE_AUDIO) return
                 val idLen = data[1].toInt() and 0xFF
@@ -178,7 +178,7 @@ class VoiceRoomClient(private val context: Context) {
     }
 
     fun setDeafen(deaf: Boolean) {
-        deafen = deaf
+        deafened = deaf
     }
 
     fun disconnect() {
