@@ -64,9 +64,14 @@ android {
 
   // Both APKs in the app: the full ("mothership") flavor bundles the lite APK
   // as an asset so its web portal can serve both downloads offline.
+  // Per-variant source sets keep debug/release outputs in separate dirs,
+  // so no two tasks claim the same output location.
   sourceSets {
-    named("full") {
-      assets.srcDir(layout.buildDirectory.get().dir("generated/assets/liteSeed").asFile)
+    named("fullDebug") {
+      assets.srcDir(layout.buildDirectory.get().dir("generated/assets/liteSeed/debug").asFile)
+    }
+    named("fullRelease") {
+      assets.srcDir(layout.buildDirectory.get().dir("generated/assets/liteSeed/release").asFile)
     }
   }
 
@@ -170,7 +175,7 @@ listOf("Debug", "Release").forEach { bt ->
   val copyTask = tasks.register("copyLite${bt}ApkForFull", Copy::class) {
     dependsOn("packageLite$bt")
     from(layout.buildDirectory.file("outputs/apk/lite/$lower/app-lite-$lower.apk"))
-    into(layout.buildDirectory.dir("generated/assets/liteSeed/seed"))
+    into(layout.buildDirectory.dir("generated/assets/liteSeed/$lower/seed"))
     rename { "aetherweb-lite.apk" }
   }
   tasks.matching { it.name == "mergeFull${bt}Assets" }.configureEach { dependsOn(copyTask) }
