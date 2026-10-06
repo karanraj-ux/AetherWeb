@@ -174,11 +174,11 @@ object MeshNetworkManager {
             getChatHistory = {
                 _uiState.value.messages.takeLast(50).map { Pair(it.senderName, it.message) }
             },
-            onMessageReceived = handleGuestChat,
+            onMessageReceived = { text, sender -> handleGuestChat(text, "$sender \uD83C\uDF10") },
  )
 
         hotspotManager = HotspotManager(appContext)
-        bleMeshManager = BleMeshManager(appContext, onWebBleMessage = handleGuestChat)
+        bleMeshManager = BleMeshManager(appContext, onWebBleMessage = { text, sender -> handleGuestChat(text, "$sender \uD83D\uDD35") })
         bleMeshManager?.initAutoThrottle() // Phase 1: auto-throttle BLE when screen off / battery low
         wifiSocketManager = WifiSocketManager(appContext, localNodeId)
         
