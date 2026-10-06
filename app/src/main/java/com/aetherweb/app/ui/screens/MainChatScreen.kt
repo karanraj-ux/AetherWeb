@@ -46,6 +46,8 @@ fun MainChatScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val diagnosticEvents by viewModel.diagnosticEvents.collectAsStateWithLifecycle()
     val callLogs by viewModel.callLogs.collectAsStateWithLifecycle()
+    // Tier-2 "Seed": lite flavor is chat-only.
+    val isLite = BuildConfig.FLAVOR == "lite"
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
         if (permissions.values.any { it }) {
@@ -428,6 +430,8 @@ fun MainChatScreen(
                         icon = { Icon(Icons.Default.Chat, "Chat") },
                         label = { Text("Chats") }
                     )
+                    // Tier-2 "Seed": hide non-chat tabs in lite flavor.
+                    if (!isLite) {
                     NavigationBarItem(
                         selected = currentTab == "Media" || currentTab == "Music",
                         onClick = { currentTab = "Media" },
@@ -463,6 +467,7 @@ fun MainChatScreen(
                         icon = { Icon(Icons.Default.Edit, "Games") },
                         label = { Text("Games") }
                     )
+                    }
                 }
             }
         },
