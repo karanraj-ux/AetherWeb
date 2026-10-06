@@ -24,7 +24,13 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 @SuppressLint("MissingPermission")
-class BleMeshManager(private val context: Context) {
+class BleMeshManager(
+    private val context: Context,
+    // Door 4 (BLE + browser): invoked when a web guest sends chat over the
+    // MESH_WEB_CHAR_UUID GATT characteristic. Default no-op keeps the existing
+    // single-arg call site compiling.
+    private val onWebBleMessage: (text: String, sender: String) -> Unit = { _, _ -> }
+) {
     private val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     private val bluetoothAdapter: BluetoothAdapter? get() = bluetoothManager.adapter
     private val scanner: BluetoothLeScanner? get() = bluetoothAdapter?.bluetoothLeScanner
@@ -34,6 +40,11 @@ class BleMeshManager(private val context: Context) {
     private val MESH_SERVICE_UUID = UUID.fromString("0000FEAA-0000-1000-8000-00805F9B34FB")
     private val MESH_CHAR_UUID = UUID.fromString("0000FEAB-0000-1000-8000-00805F9B34FB")
     private val PARCEL_UUID = ParcelUuid(MESH_SERVICE_UUID)
+    // Door 4 (BLE + browser): web-guest chat characteristic.
+    // Random 128-bit UUID generated once via python3 uuid.uuid4():
+    // ca7061c5-06fc-4258-9ed5-e04a8f6a02fa
+    private val MESH_WEB_CHAR_UUID = UUID.fromString("ca7061c5-06fc-4258-9ed5-e04a8f6a02fa")
+    private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB")
 
     private val _incomingPackets = MutableSharedFlow<String>(extraBufferCapacity = 50)
     val incomingPackets = _incomingPackets.asSharedFlow()
@@ -47,6 +58,22 @@ class BleMeshManager(private val context: Context) {
     var longRangeMode = true // BLE Coded PHY (S=8) long-range fallback
     private var isAdvertising = false
     private var gattServer: BluetoothGattServer? = null
+
+    // Door 4 state: web-BLE guests with CCCD notify enabled (device addresses),
+    // plus per-device chunk reassembly buffers keyed by msgId.
+    private val webBleSubscribed = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+    private val webBleReassembly = ConcurrentHashMap<String, MutableMap<Int, WebBleChunks>>()
+
+    // Door 4 web-BLE chat chunk protocol (20-byte ATT chunks), mirrored by the
+    // web client in WebPortalTemplate.kt:
+    //   byte0     : type (0x01 = chat JSON)
+    //   bytes1-2  : msgId, big-endian uint16
+    //   byte3     : seq (0-based)
+    //   byte4     : total chunks
+    //   bytes5-19 : payload (15 bytes)
+    // Payload = UTF-8 JSON {"n":senderName,"t":text}. Max 64 chunks per message
+    // (960 payload bytes); oversized or inconsistent messages are dropped.
+    private data class WebBleChunks(val total: Int, val chunks: Array<ByteArray?>, var lastSeen: Long)
 
     enum class BleDutyCycle(val scanWindowMs: Long, val scanRestMs: Long, val label: String) {
         HIGH_ACTIVITY(4000L, 3000L, "High Discovery (57% Duty)"),
@@ -371,6 +398,11 @@ class BleMeshManager(private val context: Context) {
     private val gattServerCallback = object : BluetoothGattServerCallback() {
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             Log.d("BleMeshManager", "GATT Server connection state change: $status -> $newState")
+            if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                // Door 4: drop web-guest state for departed devices.
+                webBleSubscribed.remove(device.address)
+                webBleReassembly.remove(device.address)
+            }
         }
 
         override fun onCharacteristicWriteRequest(
@@ -394,6 +426,15 @@ class BleMeshManager(private val context: Context) {
                         val payloadString = String(value, java.nio.charset.StandardCharsets.UTF_8)
                         _incomingPackets.tryEmit(payloadString)
                     }
+                }
+            } else if (characteristic.uuid == MESH_WEB_CHAR_UUID) {
+                // Door 4: web guest -> host chat chunk. Never touches the
+                // MESH_CHAR_UUID phone-to-phone flow above.
+                if (responseNeeded) {
+                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
+                }
+                if (value != null && value.size >= 5) {
+                    handleWebBleChunk(device.address, value)
                 }
             } else {
                 if (responseNeeded) {
@@ -429,6 +470,32 @@ class BleMeshManager(private val context: Context) {
                 }
             } else {
                 gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, offset, null)
+            }
+        }
+
+        override fun onDescriptorWriteRequest(
+            device: BluetoothDevice,
+            requestId: Int,
+            descriptor: BluetoothGattDescriptor,
+            preparedWrite: Boolean,
+            responseNeeded: Boolean,
+            offset: Int,
+            value: ByteArray?
+        ) {
+            // Door 4: track CCCD notify subscriptions from web guests.
+            // ENABLE_NOTIFICATION_VALUE = {0x01, 0x00}.
+            if (descriptor.uuid == CCCD_UUID && descriptor.characteristic?.uuid == MESH_WEB_CHAR_UUID) {
+                val enabled = value != null && value.size >= 2 && value[0] == 0x01.toByte()
+                if (enabled) webBleSubscribed.add(device.address)
+                else webBleSubscribed.remove(device.address)
+                Log.d("BleMeshManager", "Web-BLE notify ${if (enabled) "enabled" else "disabled"} for ${device.address}")
+                if (responseNeeded) {
+                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
+                }
+            } else {
+                if (responseNeeded) {
+                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, offset, null)
+                }
             }
         }
     }
@@ -725,11 +792,117 @@ class BleMeshManager(private val context: Context) {
                     BluetoothGattCharacteristic.PERMISSION_READ or BluetoothGattCharacteristic.PERMISSION_WRITE
                 )
                 service.addCharacteristic(characteristic)
+                // Door 4: web-guest chat characteristic (write + notify) with CCCD.
+                val webChar = BluetoothGattCharacteristic(
+                    MESH_WEB_CHAR_UUID,
+                    BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+                    BluetoothGattCharacteristic.PERMISSION_WRITE
+                )
+                val cccd = BluetoothGattDescriptor(
+                    CCCD_UUID,
+                    BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE
+                )
+                webChar.addDescriptor(cccd)
+                service.addCharacteristic(webChar)
+                // Fresh server => no live subscriptions from a previous life.
+                webBleSubscribed.clear()
+                webBleReassembly.clear()
                 gattServer?.addService(service)
                 Log.d("BleMeshManager", "Started GATT server with Read/Write support")
             } catch (e: Exception) {
                 Log.e("BleMeshManager", "Failed to start GATT server", e)
             }
+        }
+    }
+
+    // Door 4: reassemble one 20-byte chunk from a web guest. On a complete
+    // message, parses {"n":name,"t":text} and invokes onWebBleMessage.
+    // Runs on a GATT Binder thread; all downstream handling is thread-safe.
+    private fun handleWebBleChunk(deviceAddress: String, chunk: ByteArray) {
+        try {
+            if (chunk[0] != 0x01.toByte()) return
+            val msgId = ((chunk[1].toInt() and 0xFF) shl 8) or (chunk[2].toInt() and 0xFF)
+            val seq = chunk[3].toInt() and 0xFF
+            val total = chunk[4].toInt() and 0xFF
+            if (total < 1 || total > 64 || seq >= total) return
+            val payload = chunk.copyOfRange(5, chunk.size)
+            val devMap = webBleReassembly.getOrPut(deviceAddress) { mutableMapOf() }
+            val now = System.currentTimeMillis()
+            // Lazy expiry of stale partial messages.
+            val staleKeys = devMap.entries.filter { now - it.value.lastSeen > 30_000 }.map { it.key }
+            for (k in staleKeys) devMap.remove(k)
+            val msg = devMap.getOrPut(msgId) { WebBleChunks(total, arrayOfNulls(total), now) }
+            if (msg.total != total) return
+            msg.chunks[seq] = payload
+            msg.lastSeen = now
+            if (msg.chunks.all { it != null }) {
+                devMap.remove(msgId)
+                val json = String(
+                    msg.chunks.filterNotNull().flatMap { it.asList() }.toByteArray(),
+                    StandardCharsets.UTF_8
+                )
+                val obj = org.json.JSONObject(json)
+                val text = obj.optString("t", "")
+                if (text.isEmpty()) return
+                val name = obj.optString("n", "Web guest").ifBlank { "Web guest" }
+                try {
+                    onWebBleMessage(text, name)
+                } catch (e: Exception) {
+                    Log.e("BleMeshManager", "onWebBleMessage failed", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("BleMeshManager", "Web-BLE chunk handling failed", e)
+        }
+    }
+
+    // Door 4 fan-out: push a chat message to every subscribed web-BLE guest.
+    // No-op when nobody is subscribed. Per-device try/catch so one dead link
+    // can't break the fan-out. Thread-safe.
+    fun notifyWebBleGuests(text: String, sender: String) {
+        val subscribers = webBleSubscribed.toList()
+        if (subscribers.isEmpty()) return
+        try {
+            val json = "{\"n\":" + org.json.JSONObject.quote(sender) +
+                ",\"t\":" + org.json.JSONObject.quote(text) + "}"
+            val bytes = json.toByteArray(StandardCharsets.UTF_8)
+            val total = (bytes.size + 14) / 15
+            if (total < 1 || total > 64) return
+            val msgId = (System.currentTimeMillis() % 65536).toInt()
+            val webChar = gattServer?.getService(MESH_SERVICE_UUID)?.getCharacteristic(MESH_WEB_CHAR_UUID)
+                ?: return
+            for (i in 0 until total) {
+                val start = i * 15
+                val end = minOf(start + 15, bytes.size)
+                val chunk = ByteArray(20)
+                chunk[0] = 0x01
+                chunk[1] = (msgId shr 8).toByte()
+                chunk[2] = (msgId and 0xFF).toByte()
+                chunk[3] = i.toByte()
+                chunk[4] = total.toByte()
+                System.arraycopy(bytes, start, chunk, 5, end - start)
+                // The pre-API-33 notify path mutates characteristic.value, so
+                // serialize per-chunk delivery across devices.
+                synchronized(webChar) {
+                    for (address in subscribers) {
+                        try {
+                            val device = bluetoothAdapter?.getRemoteDevice(address) ?: continue
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                gattServer?.notifyCharacteristicChanged(device, webChar, false, chunk)
+                            } else {
+                                @Suppress("DEPRECATION")
+                                webChar.value = chunk
+                                @Suppress("DEPRECATION")
+                                gattServer?.notifyCharacteristicChanged(device, webChar, false)
+                            }
+                        } catch (e: Exception) {
+                            Log.w("BleMeshManager", "Web-BLE notify failed for $address", e)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("BleMeshManager", "notifyWebBleGuests failed", e)
         }
     }
 
