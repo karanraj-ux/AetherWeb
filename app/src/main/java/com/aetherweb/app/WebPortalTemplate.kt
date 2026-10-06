@@ -791,6 +791,9 @@ object WebPortalTemplate {
         }
 
         // Messaging Engine & History
+        // Door tags (🌐 WiFi portal, 🔵 BLE guest) are baked into sender names
+        // for visibility; strip them when checking identity.
+        function bareName(n) { return (n || '').replace(/ [🌐🔵]$/, ''); }
         const messagesScroller = document.getElementById('messages-scroller');
         let lastHistoryHash = "";
 
@@ -874,7 +877,7 @@ object WebPortalTemplate {
                                 continue;
                             }
                         } catch(e) {}
-                        appendMessageElement(m.sender, m.message, m.sender === myName, false);
+                        appendMessageElement(m.sender, m.message, bareName(m.sender) === myName, false);
                     }
                     messagesScroller.scrollTop = messagesScroller.scrollHeight;
                 }
@@ -1376,7 +1379,7 @@ object WebPortalTemplate {
                     const obj = JSON.parse(new TextDecoder().decode(bytes));
                     if (obj && typeof obj.t === 'string') {
                         const nm = (typeof obj.n === 'string' && obj.n) ? obj.n : 'Web guest';
-                        appendMessageElement(nm + ' 🔵', obj.t, nm === myName);
+                        appendMessageElement(nm, obj.t, bareName(nm) === myName);
                     }
                 }
             } catch (e) {}
