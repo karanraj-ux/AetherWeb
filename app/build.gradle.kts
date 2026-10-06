@@ -46,6 +46,22 @@ android {
     }
     debug { signingConfig = signingConfigs.getByName("debugConfig") }
   }
+
+  // Tier-2 "Seed": chat-only minimal flavor. Shared code stays flavor-agnostic;
+  // UI/portal gate on BuildConfig.FLAVOR.
+  flavorDimensions += "tier"
+  productFlavors {
+    create("full") {
+      dimension = "tier"
+    }
+    create("lite") {
+      dimension = "tier"
+      applicationIdSuffix = ".lite"
+      versionNameSuffix = "-lite"
+      resValue("string", "app_name", "Aether Seed")
+    }
+  }
+
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
