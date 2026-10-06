@@ -59,6 +59,11 @@ jobs:
         mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/AetherWeb-release.apk || true
         mv app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/AetherWeb-release-unsigned.apk || true
         mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/AetherWeb-debug.apk || true
+        # Tier-2 "Seed": with product flavors, outputs live under apk/<flavor>/.
+        mv app/build/outputs/apk/full/release/app-full-release.apk app/build/outputs/apk/full/release/AetherWeb-release.apk || true
+        mv app/build/outputs/apk/full/debug/app-full-debug.apk app/build/outputs/apk/full/debug/AetherWeb-debug.apk || true
+        mv app/build/outputs/apk/lite/release/app-lite-release.apk app/build/outputs/apk/lite/release/AetherWeb-lite-release.apk || true
+        mv app/build/outputs/apk/lite/debug/app-lite-debug.apk app/build/outputs/apk/lite/debug/AetherWeb-lite-debug.apk || true
 
     - name: Upload Built APKs
       uses: actions/upload-artifact@v4
@@ -67,6 +72,10 @@ jobs:
         path: |
           app/build/outputs/apk/release/*.apk
           app/build/outputs/apk/debug/*.apk
+          app/build/outputs/apk/full/release/*.apk
+          app/build/outputs/apk/full/debug/*.apk
+          app/build/outputs/apk/lite/release/*.apk
+          app/build/outputs/apk/lite/debug/*.apk
 
   release:
     needs: build
