@@ -66,7 +66,7 @@ android {
   // as an asset so its web portal can serve both downloads offline.
   sourceSets {
     named("full") {
-      assets.srcDir(layout.buildDirectory.dir("generated/assets/liteSeed"))
+      assets.srcDir(layout.buildDirectory.get().dir("generated/assets/liteSeed").asFile)
     }
   }
 
