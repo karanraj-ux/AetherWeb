@@ -80,6 +80,14 @@ object MeshNetworkManager {
     
     var isInitialized = false
 
+    // Door 4 fan-out: every guest-visible message goes to WS browsers AND
+    // subscribed BLE web guests. Safe to call before either manager exists
+    // (both calls no-op on null). Never throws.
+    fun fanOutToGuests(text: String, sender: String) {
+        try { webServerManager?.broadcastMessage(text, sender) } catch (e: Exception) { }
+        try { bleMeshManager?.notifyWebBleGuests(text, sender) } catch (e: Exception) { }
+    }
+
     fun initialize(context: Context) {
         if (isInitialized) return
         isInitialized = true
@@ -88,6 +96,45 @@ object MeshNetworkManager {
         meshRouter.localNodeName = android.os.Build.MODEL
 
         val appContext = context.applicationContext
+
+        // Door 4: single handler for guest chat arriving over any web transport
+        // (WebSocket via WebServerManager, or BLE GATT via BleMeshManager).
+        // Shared by both managers so every guest message gets identical handling.
+        val handleGuestChat: (String, String) -> Unit = msgLambda@ { text, sender ->
+                try {
+                    val packet = com.aetherweb.app.protocol.MeshPacketCodec.decode(text)
+                    if (packet !is com.aetherweb.app.protocol.MeshPacket.Raw) {
+                        val handled = com.aetherweb.app.protocol.MeshPacketDispatcher.dispatch(
+                            packet = packet,
+                            senderId = "web_client",
+                            senderName = sender,
+                            messageId = java.util.UUID.randomUUID().toString(),
+                            timestamp = System.currentTimeMillis(),
+                            isFromWeb = true,
+                            context = appContext
+                        )
+                        if (handled) {
+                            meshRouter.routeLocalMessage(text)
+                            fanOutToGuests(text, sender)
+                            return@msgLambda
+                        }
+                    }
+                } catch (e: Exception) { e.printStackTrace() }
+
+                DiagnosticLogger.log("Message Lifecycle", "Host Received", "Host phone successfully parsed the JSON payload", EventStatus.SUCCESS)
+                val webMsg = ChatMessage(
+                    senderName = sender,
+                    senderId = "web_client",
+                    message = text,
+                    isFromMe = false
+ )
+                _uiState.update { it.copy(
+                    messages = it.messages + webMsg
+ ) }
+                AetherFeedManager.handleIncomingChatMessage(text, sender)
+                meshRouter.routeLocalMessage("${sender}: $text")
+                fanOutToGuests(text, sender)
+        }
 
         webServerManager = WebServerManager(
             context = appContext,
@@ -127,45 +174,11 @@ object MeshNetworkManager {
             getChatHistory = {
                 _uiState.value.messages.takeLast(50).map { Pair(it.senderName, it.message) }
             },
-            onMessageReceived = msgLambda@ { text, sender ->
-                try {
-                    val packet = com.aetherweb.app.protocol.MeshPacketCodec.decode(text)
-                    if (packet !is com.aetherweb.app.protocol.MeshPacket.Raw) {
-                        val handled = com.aetherweb.app.protocol.MeshPacketDispatcher.dispatch(
-                            packet = packet,
-                            senderId = "web_client",
-                            senderName = sender,
-                            messageId = java.util.UUID.randomUUID().toString(),
-                            timestamp = System.currentTimeMillis(),
-                            isFromWeb = true,
-                            context = appContext
-                        )
-                        if (handled) {
-                            meshRouter.routeLocalMessage(text)
-                            com.aetherweb.app.MeshNetworkManager.webServerManager?.broadcastMessage(text, sender)
-                            return@msgLambda
-                        }
-                    }
-                } catch (e: Exception) { e.printStackTrace() }
-
-                DiagnosticLogger.log("Message Lifecycle", "Host Received", "Host phone successfully parsed the JSON payload", EventStatus.SUCCESS)
-                val webMsg = ChatMessage(
-                    senderName = sender,
-                    senderId = "web_client",
-                    message = text,
-                    isFromMe = false
- )
-                _uiState.update { it.copy(
-                    messages = it.messages + webMsg
- ) }
-                AetherFeedManager.handleIncomingChatMessage(text, sender)
-                meshRouter.routeLocalMessage("${sender}: $text")
-                webServerManager?.broadcastMessage(text, sender)
-            }
+            onMessageReceived = handleGuestChat,
  )
 
         hotspotManager = HotspotManager(appContext)
-        bleMeshManager = BleMeshManager(appContext)
+        bleMeshManager = BleMeshManager(appContext, onWebBleMessage = handleGuestChat)
         bleMeshManager?.initAutoThrottle() // Phase 1: auto-throttle BLE when screen off / battery low
         wifiSocketManager = WifiSocketManager(appContext, localNodeId)
         
@@ -351,7 +364,7 @@ class MeshForegroundService : Service() {
                     e.printStackTrace()
                 }
 
-                com.aetherweb.app.MeshNetworkManager.webServerManager?.broadcastMessage(
+                fanOutToGuests(
                     networkMessage.payload,
                     if (networkMessage.senderName.isNotBlank()) networkMessage.senderName else "Peer_${networkMessage.senderId.take(4)}"
                 )
