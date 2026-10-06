@@ -173,5 +173,5 @@ listOf("Debug", "Release").forEach { bt ->
     into(layout.buildDirectory.dir("generated/assets/liteSeed/seed"))
     rename { "aetherweb-lite.apk" }
   }
-  tasks.named("mergeFull${bt}Assets") { dependsOn(copyTask) }
+  tasks.matching { it.name == "mergeFull${bt}Assets" }.configureEach { dependsOn(copyTask) }
 }
