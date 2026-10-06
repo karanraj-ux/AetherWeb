@@ -364,7 +364,7 @@ class MeshForegroundService : Service() {
                     e.printStackTrace()
                 }
 
-                fanOutToGuests(
+                MeshNetworkManager.fanOutToGuests(
                     networkMessage.payload,
                     if (networkMessage.senderName.isNotBlank()) networkMessage.senderName else "Peer_${networkMessage.senderId.take(4)}"
                 )
