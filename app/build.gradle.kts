@@ -175,3 +175,8 @@ listOf("Debug", "Release").forEach { bt ->
   }
   tasks.matching { it.name == "mergeFull${bt}Assets" }.configureEach { dependsOn(copyTask) }
 }
+// Lint/vital tasks also scan the full flavor's assets dir (which includes the
+// generated lite-seed output), so order them after both copy tasks.
+tasks.matching { it.name.contains("Full") && it.name.lowercase().contains("lint") }.configureEach {
+  dependsOn("copyLiteDebugApkForFull", "copyLiteReleaseApkForFull")
+}
