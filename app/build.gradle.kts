@@ -1,3 +1,11 @@
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -163,17 +171,34 @@ dependencies {
 // Both APKs in the app: the full ("mothership") flavor bundles the lite APK
 // as a generated asset so its web portal can serve both downloads offline.
 // Wired through the AGP Variant API: AGP picks the output dir and computes
-// task dependencies automatically.
+// task dependencies automatically. (A plain Copy task can't be used here —
+// Gradle 9's Copy has no DirectoryProperty output, which the Variant API
+// requires. Hence this tiny task type.)
+abstract class BundleLiteApk : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val inputApk: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun run() {
+        val out = outputDir.file("aetherweb-lite.apk").get().asFile
+        out.parentFile.mkdirs()
+        inputApk.get().asFile.copyTo(out, overwrite = true)
+    }
+}
+
 androidComponents {
   listOf("debug", "release").forEach { bt ->
     onVariants(selector().withBuildType(bt).withFlavor("tier", "full")) {
       val btCap = bt.replaceFirstChar { it.uppercaseChar() }
-      val copyTask = tasks.register<Copy>("copyLite${btCap}ApkForFull") {
+      val bundleTask = tasks.register<BundleLiteApk>("bundleLite${btCap}ApkForFull") {
         dependsOn("packageLite$btCap")
-        from(layout.buildDirectory.file("outputs/apk/lite/$bt/app-lite-$bt.apk"))
-        rename { "aetherweb-lite.apk" }
+        inputApk.set(layout.buildDirectory.file("outputs/apk/lite/$bt/app-lite-$bt.apk"))
       }
-      it.sources.assets?.addGeneratedSourceDirectory(copyTask) { copy -> copy.destinationDir }
+      it.sources.assets?.addGeneratedSourceDirectory(bundleTask, BundleLiteApk::outputDir)
     }
   }
 }
