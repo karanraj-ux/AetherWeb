@@ -412,7 +412,7 @@ class WebServerManager(
                             call.response.header("Pragma", "no-cache")
                             call.response.header("Expires", "0")
                             call.respondText(
-                                WebPortalTemplate.getHtml(),
+                                WebPortalTemplate.getHtml(isLite = BuildConfig.FLAVOR == "lite"),
                                 io.ktor.http.ContentType.Text.Html,
                                 io.ktor.http.HttpStatusCode.OK
                             )
@@ -832,7 +832,7 @@ class WebServerManager(
                             call.response.header("Cache-Control", "no-cache, no-store, must-revalidate")
                             call.response.header("Pragma", "no-cache")
                             call.response.header("Expires", "0")
-                            call.respondText(WebPortalTemplate.getHtml(), io.ktor.http.ContentType.Text.Html, io.ktor.http.HttpStatusCode.OK)
+                            call.respondText(WebPortalTemplate.getHtml(isLite = BuildConfig.FLAVOR == "lite"), io.ktor.http.ContentType.Text.Html, io.ktor.http.HttpStatusCode.OK)
                         } catch (e: Exception) {
                             Log.e("WebServer", "Error in /chat route", e)
                             DiagnosticLogger.log("WebServer", "Error /chat", e.stackTraceToString().take(200), EventStatus.ERROR)

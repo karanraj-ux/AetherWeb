@@ -13,7 +13,75 @@ package com.aetherweb.app
  */
 object WebPortalTemplate {
 
-    fun getHtml(): String {
+    fun getHtml(isLite: Boolean = false): String {
+        // Tier-2 "Seed": lite flavor serves a chat-only portal (no voice, games, IDE).
+        val voiceBtnHtml = if (isLite) "" else """<button class="action-btn" onclick="toggleVoicePanel()" id="voice-btn" title="Voice Room">🎙</button>"""
+        val voicePanelHtml = if (isLite) "" else """
+    <div id="voice-panel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:var(--card-bg);border-radius:12px;padding:20px;width:320px;max-height:80vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <div style="font-weight:bold;font-size:16px;">Voice Room</div>
+                <button onclick="toggleVoicePanel()" style="background:none;border:none;color:var(--text-secondary);font-size:18px;cursor:pointer;">&#10005;</button>
+            </div>
+            <div id="voice-panel-status" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">A live voice channel for everyone in this room.</div>
+            <div id="voice-https-warning" style="display:none;background:#7a4a00;color:#ffe0b2;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px;"></div>
+            <button id="voice-join-btn" onclick="requestVoiceJoin()" class="action-btn green" style="width:100%;justify-content:center;padding:10px;margin-bottom:8px;">Join Voice Room</button>
+            <button id="voice-mic-btn" onclick="toggleVoiceMic()" class="action-btn" style="display:none;width:100%;justify-content:center;padding:10px;margin-bottom:8px;">Mic Off</button>
+            <button id="voice-deafen-btn" onclick="toggleVoiceDeafen()" class="action-btn" style="display:none;width:100%;justify-content:center;padding:10px;margin-bottom:8px;">Deafen</button>
+            <div id="voice-members" style="display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
+    </div>"""
+        val arcadeNavHtml = if (isLite) "" else """
+            <button class="nav-item" onclick="navigateTo('arcade')">
+                <span class="icon">🎮</span>
+                <span>Arcade</span>
+            </button>"""
+        val arcadePageHtml = if (isLite) "" else """
+            <!-- PAGE 3: ARCADE & GAMES -->
+            <section id="view-arcade" class="page-view">
+                <div id="arcade-menu" class="arcade-container">
+                    <div>
+                        <h3 style="margin:0 0 4px;">🎮 Offline Mesh Arcade</h3>
+                        <p style="margin:0; font-size:12px; color:var(--text-secondary);">Zero-internet multiplayer and casual games powered by local Wi-Fi.</p>
+                    </div>
+                    <div class="game-selection-grid">
+                        <div class="game-card" onclick="openEmbeddedGame('/tictactoe', '⭕ Tic-Tac-Toe')">
+                            <span class="game-card-icon">⭕</span>
+                            <span class="game-card-title">Tic-Tac-Toe</span>
+                            <span class="game-card-desc">Quick 3x3 strategy</span>
+                        </div>
+                        <div class="game-card" onclick="openEmbeddedGame('/chess', '♟️ Chess')">
+                            <span class="game-card-icon">♟️</span>
+                            <span class="game-card-title">Chess</span>
+                            <span class="game-card-desc">Classic 2-player board</span>
+                        </div>
+                        <div class="game-card" onclick="openEmbeddedGame('/snake', '🐍 Snake')">
+                            <span class="game-card-icon">🐍</span>
+                            <span class="game-card-title">Retro Snake</span>
+                            <span class="game-card-desc">Classic arcade run</span>
+                        </div>
+                        <div class="game-card" onclick="openEmbeddedGame('/pool', '🎱 8-Ball Pool')">
+                            <span class="game-card-icon">🎱</span>
+                            <span class="game-card-title">8-Ball Pool</span>
+                            <span class="game-card-desc">Billiards simulation</span>
+                        </div>
+                        <div class="game-card" onclick="openEmbeddedGame('/ide', '💻 Web IDE')">
+                            <span class="game-card-icon">💻</span>
+                            <span class="game-card-title">Code Scratchpad</span>
+                            <span class="game-card-desc">Offline HTML/JS editor</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Embedded Game Frame (No navigation break) -->
+                <div id="active-game-frame-container">
+                    <div id="game-frame-header">
+                        <span id="active-game-title" style="font-weight:bold; font-size:14px;">Game</span>
+                        <button onclick="closeEmbeddedGame()" style="background:#ef4444; color:white; border:none; padding:4px 10px; border-radius:6px; font-weight:bold; cursor:pointer;">✕ Close Game</button>
+                    </div>
+                    <iframe id="active-game-iframe" src="about:blank"></iframe>
+                </div>
+            </section>"""
         return """
 <!DOCTYPE html>
 <html lang="en">
@@ -349,7 +417,7 @@ object WebPortalTemplate {
             </div>
             <div class="header-actions">
                 <button class="action-btn" onclick="toggleTheme()" id="theme-btn" title="Toggle Dark/Light">🌓</button>
-                <button class="action-btn" onclick="toggleVoicePanel()" id="voice-btn" title="Voice Room">🎙</button>
+                $voiceBtnHtml
                 <button class="action-btn" onclick="toggleBle()" id="ble-btn" title="Connect via Bluetooth (no WiFi needed)">🔵</button>
                 <a href="/download" class="action-btn green" download="MeshChat.apk" title="Download Android APK">⬇️ APK</a>
             </div>
@@ -442,51 +510,7 @@ object WebPortalTemplate {
                 </div>
             </section>
 
-            <!-- PAGE 3: ARCADE & GAMES -->
-            <section id="view-arcade" class="page-view">
-                <div id="arcade-menu" class="arcade-container">
-                    <div>
-                        <h3 style="margin:0 0 4px;">🎮 Offline Mesh Arcade</h3>
-                        <p style="margin:0; font-size:12px; color:var(--text-secondary);">Zero-internet multiplayer and casual games powered by local Wi-Fi.</p>
-                    </div>
-                    <div class="game-selection-grid">
-                        <div class="game-card" onclick="openEmbeddedGame('/tictactoe', '⭕ Tic-Tac-Toe')">
-                            <span class="game-card-icon">⭕</span>
-                            <span class="game-card-title">Tic-Tac-Toe</span>
-                            <span class="game-card-desc">Quick 3x3 strategy</span>
-                        </div>
-                        <div class="game-card" onclick="openEmbeddedGame('/chess', '♟️ Chess')">
-                            <span class="game-card-icon">♟️</span>
-                            <span class="game-card-title">Chess</span>
-                            <span class="game-card-desc">Classic 2-player board</span>
-                        </div>
-                        <div class="game-card" onclick="openEmbeddedGame('/snake', '🐍 Snake')">
-                            <span class="game-card-icon">🐍</span>
-                            <span class="game-card-title">Retro Snake</span>
-                            <span class="game-card-desc">Classic arcade run</span>
-                        </div>
-                        <div class="game-card" onclick="openEmbeddedGame('/pool', '🎱 8-Ball Pool')">
-                            <span class="game-card-icon">🎱</span>
-                            <span class="game-card-title">8-Ball Pool</span>
-                            <span class="game-card-desc">Billiards simulation</span>
-                        </div>
-                        <div class="game-card" onclick="openEmbeddedGame('/ide', '💻 Web IDE')">
-                            <span class="game-card-icon">💻</span>
-                            <span class="game-card-title">Code Scratchpad</span>
-                            <span class="game-card-desc">Offline HTML/JS editor</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Embedded Game Frame (No navigation break) -->
-                <div id="active-game-frame-container">
-                    <div id="game-frame-header">
-                        <span id="active-game-title" style="font-weight:bold; font-size:14px;">Game</span>
-                        <button onclick="closeEmbeddedGame()" style="background:#ef4444; color:white; border:none; padding:4px 10px; border-radius:6px; font-weight:bold; cursor:pointer;">✕ Close Game</button>
-                    </div>
-                    <iframe id="active-game-iframe" src="about:blank"></iframe>
-                </div>
-            </section>
+            $arcadePageHtml
 
             <!-- PAGE 4: TOOLS & CLIPBOARD -->
             <section id="view-tools" class="page-view">
@@ -533,10 +557,7 @@ object WebPortalTemplate {
                 <span class="icon">📁</span>
                 <span>Vault</span>
             </button>
-            <button class="nav-item" onclick="navigateTo('arcade')">
-                <span class="icon">🎮</span>
-                <span>Arcade</span>
-            </button>
+            $arcadeNavHtml
             <button class="nav-item" onclick="navigateTo('tools')">
                 <span class="icon">📋</span>
                 <span>Tools</span>
@@ -545,20 +566,7 @@ object WebPortalTemplate {
     </div>
 
     <!-- Voice Room Phase 2: dashboard panel -->
-    <div id="voice-panel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
-        <div style="background:var(--card-bg);border-radius:12px;padding:20px;width:320px;max-height:80vh;overflow-y:auto;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                <div style="font-weight:bold;font-size:16px;">Voice Room</div>
-                <button onclick="toggleVoicePanel()" style="background:none;border:none;color:var(--text-secondary);font-size:18px;cursor:pointer;">&#10005;</button>
-            </div>
-            <div id="voice-panel-status" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">A live voice channel for everyone in this room.</div>
-            <div id="voice-https-warning" style="display:none;background:#7a4a00;color:#ffe0b2;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px;"></div>
-            <button id="voice-join-btn" onclick="requestVoiceJoin()" class="action-btn green" style="width:100%;justify-content:center;padding:10px;margin-bottom:8px;">Join Voice Room</button>
-            <button id="voice-mic-btn" onclick="toggleVoiceMic()" class="action-btn" style="display:none;width:100%;justify-content:center;padding:10px;margin-bottom:8px;">Mic Off</button>
-            <button id="voice-deafen-btn" onclick="toggleVoiceDeafen()" class="action-btn" style="display:none;width:100%;justify-content:center;padding:10px;margin-bottom:8px;">Deafen</button>
-            <div id="voice-members" style="display:flex;flex-direction:column;gap:6px;"></div>
-        </div>
-    </div>
+                $voicePanelHtml
 
     <!-- Client Script (Persistent WebSocket + Navigation Engine) -->
     <script>
