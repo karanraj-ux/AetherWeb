@@ -350,6 +350,7 @@ object WebPortalTemplate {
             <div class="header-actions">
                 <button class="action-btn" onclick="toggleTheme()" id="theme-btn" title="Toggle Dark/Light">🌓</button>
                 <button class="action-btn" onclick="toggleVoicePanel()" id="voice-btn" title="Voice Room">🎙</button>
+                <button class="action-btn" onclick="toggleBle()" id="ble-btn" title="Connect via Bluetooth (no WiFi needed)">🔵</button>
                 <a href="/download" class="action-btn green" download="MeshChat.apk" title="Download Android APK">⬇️ APK</a>
             </div>
         </header>
@@ -386,6 +387,7 @@ object WebPortalTemplate {
                         <input type="text" id="chat-text-input" class="chat-input" placeholder="Message" autocomplete="off" required>
                         <button type="submit" class="send-round-btn">➤</button>
                     </form>
+                    <div id="transport-ind" style="font-size:11px;color:var(--text-secondary);text-align:right;min-height:14px;padding:0 4px;" title=""></div>
                     <form id="upload-form" class="chat-row" style="margin-top:2px;" onsubmit="handleFileUpload(event)">
                         <input type="file" id="file-selector" style="flex:1; font-size:12px; color:var(--text-secondary);" required>
                         <button type="submit" id="file-upload-btn" class="action-btn" style="background:var(--input-bg);">📎 Share</button>
@@ -893,6 +895,7 @@ object WebPortalTemplate {
             ws = new WebSocket(url);
             ws.onopen = () => {
                 document.getElementById('diag-ws-status').innerText = 'Active (Connected)';
+                updateBleUi();
             };
             ws.onmessage = (e) => {
                 try {
@@ -918,6 +921,7 @@ object WebPortalTemplate {
             };
             ws.onclose = () => {
                 document.getElementById('diag-ws-status').innerText = 'Reconnecting in 2s...';
+                updateBleUi();
                 setTimeout(connectWebSocket, 2000);
             };
         }
@@ -925,6 +929,9 @@ object WebPortalTemplate {
 
         // Voice Room Phase 1: first visit -> force temp-profile setup.
         try { if (!localStorage.getItem('aether_profile')) openProfileModal(); } catch(e) {}
+
+        // Door 4: silent BLE reconnect for returning guests (no picker).
+        bleAutoReconnect();
 
         // Voice Room Phase 2: dashboard panel (audio pipe lands in Phase 3).
         let voicePanelState = 'idle'; // idle | requested | joined
@@ -1212,6 +1219,171 @@ object WebPortalTemplate {
             if (voiceStatusTimer) { clearInterval(voiceStatusTimer); voiceStatusTimer = null; }
         }
 
+        // Door 4: BLE + browser chat over Web Bluetooth. No WiFi needed — the
+        // browser connects as a GATT central to the phone's mesh service and
+        // exchanges chunked chat frames (mirrors BleMeshManager's protocol):
+        //   byte0=0x01, bytes1-2=msgId BE, byte3=seq, byte4=total, bytes5-19=payload(15B)
+        // Payload = UTF-8 JSON {"n":name,"t":text}. Rendered via the same
+        // appendMessageElement as WS chat; own messages render on BLE echo
+        // (same discipline as WS: no optimistic render, so no dedupe needed).
+        const BLE_MESH_SERVICE = 0xFEAA;
+        const BLE_WEB_CHAR = 'ca7061c5-06fc-4258-9ed5-e04a8f6a02fa';
+        let bleLink = null; // {device, char, rx: Map(msgId -> {total, chunks, seen})}
+
+        function bleToast(html, ms) {
+            let t = document.getElementById('ble-toast');
+            if (!t) {
+                t = document.createElement('div');
+                t.id = 'ble-toast';
+                t.style.cssText = 'position:fixed;left:50%;bottom:70px;transform:translateX(-50%);' +
+                    'background:#323232;color:#fff;border-radius:8px;padding:10px 14px;font-size:13px;' +
+                    'z-index:2000;max-width:86vw;text-align:center;display:none;';
+                document.body.appendChild(t);
+            }
+            t.innerHTML = html;
+            t.style.display = 'block';
+            if (t._timer) clearTimeout(t._timer);
+            t._timer = setTimeout(() => { t.style.display = 'none'; }, ms || 6000);
+        }
+
+        function bleHttpsNudge() {
+            bleToast('BLE needs the secure portal. <a href="https://' + window.location.hostname +
+                ':8443/" style="color:#ffe0b2;font-weight:bold;">Tap here for HTTPS</a>', 12000);
+        }
+
+        function updateBleUi() {
+            const b = document.getElementById('ble-btn');
+            if (b) {
+                b.classList.toggle('green', !!bleLink);
+                b.title = bleLink ? 'BLE chat connected — tap to disconnect' : 'Connect via Bluetooth (no WiFi needed)';
+            }
+            const ind = document.getElementById('transport-ind');
+            if (ind) {
+                const wsUp = (typeof ws !== 'undefined' && ws && ws.readyState === WebSocket.OPEN);
+                ind.textContent = wsUp ? '🌐 WiFi' : (bleLink ? '🔵 BLE' : '');
+                ind.title = wsUp ? 'Sending via WiFi' : (bleLink ? 'Sending via Bluetooth' : 'Not connected');
+            }
+        }
+
+        async function toggleBle() {
+            if (bleLink) { bleDetach(true); return; }
+            await connectBle();
+        }
+
+        async function connectBle() {
+            if (!navigator.bluetooth) { bleToast('Web Bluetooth needs Chrome on Android.'); return; }
+            if (window.location.protocol !== 'https:') { bleHttpsNudge(); return; }
+            let device;
+            try {
+                // First contact: the system picker is mandatory (browser privacy),
+                // but filtered to mesh advertisers only — one tap.
+                device = await navigator.bluetooth.requestDevice({ filters: [{ services: [BLE_MESH_SERVICE] }] });
+            } catch (e) { return; } // user cancelled the picker
+            await bleAttach(device);
+        }
+
+        async function bleAttach(device) {
+            try {
+                if (bleLink) bleDetach(false);
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(BLE_MESH_SERVICE);
+                const char = await service.getCharacteristic(BLE_WEB_CHAR);
+                await char.startNotifications();
+                const link = { device: device, char: char, rx: new Map() };
+                char.oncharacteristicvaluechanged = (ev) => bleOnNotify(link, ev.target.value);
+                device.ongattserverdisconnected = () => { if (bleLink === link) bleDetach(false); };
+                bleLink = link;
+                try { localStorage.setItem('aether_ble_id', device.id); } catch (e) {}
+                updateBleUi();
+                bleToast('🔵 BLE chat connected');
+            } catch (e) {
+                bleToast('BLE connect failed: ' + (e && e.message ? e.message : e));
+                updateBleUi();
+            }
+        }
+
+        function bleDetach(forget) {
+            const link = bleLink;
+            bleLink = null;
+            if (link) {
+                try { link.char.stopNotifications(); } catch (e) {}
+                try { link.device.gatt.disconnect(); } catch (e) {}
+                link.rx.clear();
+            }
+            if (forget) { try { localStorage.removeItem('aether_ble_id'); } catch (e) {} }
+            updateBleUi();
+        }
+
+        // Silent reconnect for returning guests: getDevices() needs no picker
+        // and no user gesture.
+        async function bleAutoReconnect() {
+            try {
+                if (!navigator.bluetooth || !navigator.bluetooth.getDevices) return;
+                if (window.location.protocol !== 'https:') return;
+                const id = localStorage.getItem('aether_ble_id');
+                if (!id) return;
+                const devices = await navigator.bluetooth.getDevices();
+                const dev = devices.find((d) => d.id === id);
+                if (dev) await bleAttach(dev);
+            } catch (e) {}
+        }
+
+        function bleOnNotify(link, dv) {
+            try {
+                if (!dv || dv.byteLength < 5 || dv.getUint8(0) !== 0x01) return;
+                const msgId = dv.getUint16(1, false);
+                const seq = dv.getUint8(3), total = dv.getUint8(4);
+                if (total < 1 || total > 64 || seq >= total) return;
+                const payload = new Uint8Array(dv.buffer, dv.byteOffset + 5, dv.byteLength - 5);
+                let m = link.rx.get(msgId);
+                if (!m || m.total !== total) {
+                    m = { total: total, chunks: new Array(total).fill(null), seen: Date.now() };
+                    link.rx.set(msgId, m);
+                }
+                m.chunks[seq] = payload;
+                m.seen = Date.now();
+                const now = Date.now();
+                for (const [k, v] of link.rx) { if (now - v.seen > 30000) link.rx.delete(k); }
+                if (m.chunks.every((c) => c)) {
+                    link.rx.delete(msgId);
+                    let len = 0;
+                    for (const c of m.chunks) len += c.length;
+                    const bytes = new Uint8Array(len);
+                    let off = 0;
+                    for (const c of m.chunks) { bytes.set(c, off); off += c.length; }
+                    const obj = JSON.parse(new TextDecoder().decode(bytes));
+                    if (obj && typeof obj.t === 'string') {
+                        const nm = (typeof obj.n === 'string' && obj.n) ? obj.n : 'Web guest';
+                        appendMessageElement(nm + ' 🔵', obj.t, nm === myName);
+                    }
+                }
+            } catch (e) {}
+        }
+
+        async function bleSendChat(text) {
+            const link = bleLink;
+            if (!link) return false;
+            try {
+                const bytes = new TextEncoder().encode(JSON.stringify({ n: myName, t: text }));
+                const total = Math.ceil(bytes.length / 15);
+                if (total < 1 || total > 64) return false;
+                const msgId = Date.now() % 65536;
+                for (let i = 0; i < total; i++) {
+                    const chunk = new Uint8Array(20);
+                    chunk[0] = 0x01;
+                    chunk[1] = (msgId >> 8) & 0xFF;
+                    chunk[2] = msgId & 0xFF;
+                    chunk[3] = i;
+                    chunk[4] = total;
+                    chunk.set(bytes.subarray(i * 15, Math.min((i + 1) * 15, bytes.length)), 5);
+                    await link.char.writeValueWithResponse(chunk);
+                }
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
         async function handleSendChat(e) {
             e.preventDefault();
             const input = document.getElementById('chat-text-input');
@@ -1222,6 +1394,9 @@ object WebPortalTemplate {
             const payload = JSON.stringify({ sender: myName, message: txt });
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(payload);
+            } else if (bleLink) {
+                // Door 4: no WiFi — send over BLE. Echo arrives via notify.
+                await bleSendChat(txt);
             } else {
                 await fetch('/api/send', {
                     method: 'POST',
