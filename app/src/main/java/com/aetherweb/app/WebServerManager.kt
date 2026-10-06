@@ -621,8 +621,9 @@ class WebServerManager(
                             call.response.header("Access-Control-Allow-Origin", "*")
                             call.response.header("Cache-Control", "no-cache, no-store, must-revalidate")
                             val apkFile = File(this@WebServerManager.context.applicationInfo.sourceDir)
+                            val dlName = if (BuildConfig.FLAVOR == "lite") "AetherWeb-lite.apk" else "AetherWeb.apk"
                             if (apkFile.exists()) {
-                                call.response.header(io.ktor.http.HttpHeaders.ContentDisposition, "attachment; filename=\"MeshChat.apk\"")
+                                call.response.header(io.ktor.http.HttpHeaders.ContentDisposition, "attachment; filename=\"$dlName\"")
                                 call.response.header(io.ktor.http.HttpHeaders.ContentType, "application/vnd.android.package-archive")
                                 call.response.header(io.ktor.http.HttpHeaders.ContentLength, apkFile.length().toString())
                                 call.response.header("Accept-Ranges", "bytes")
@@ -632,6 +633,40 @@ class WebServerManager(
                             }
                         } catch (e: Exception) {
                             Log.e("WebServer", "Error in /download route", e)
+                            call.respondText(e.message ?: "Unknown Error", status = io.ktor.http.HttpStatusCode.InternalServerError)
+                        }
+                    }
+                    // Both APKs on the web: serves the bundled lite seed APK (full flavor).
+                    // Lite flavor has no bundled asset, so it serves its own APK (it IS the lite app).
+                    get("/download-lite") {
+                        try {
+                            call.response.header("Access-Control-Allow-Origin", "*")
+                            call.response.header("Cache-Control", "no-cache, no-store, must-revalidate")
+                            val ctx = this@WebServerManager.context
+                            val seedName = "aetherweb-lite-${BuildConfig.VERSION_NAME}.apk"
+                            val seedFile = File(ctx.cacheDir, seedName)
+                            if (!seedFile.exists()) {
+                                try {
+                                    ctx.assets.open("seed/aetherweb-lite.apk").use { input ->
+                                        seedFile.outputStream().use { input.copyTo(it) }
+                                    }
+                                } catch (e: Exception) {
+                                    Log.w("WebServer", "No bundled lite seed asset; falling back to own APK")
+                                }
+                            }
+                            val apkFile = if (seedFile.exists()) seedFile
+                                else File(ctx.applicationInfo.sourceDir)
+                            if (apkFile.exists()) {
+                                call.response.header(io.ktor.http.HttpHeaders.ContentDisposition, "attachment; filename=\"AetherWeb-lite.apk\"")
+                                call.response.header(io.ktor.http.HttpHeaders.ContentType, "application/vnd.android.package-archive")
+                                call.response.header(io.ktor.http.HttpHeaders.ContentLength, apkFile.length().toString())
+                                call.response.header("Accept-Ranges", "bytes")
+                                call.respondFile(apkFile)
+                            } else {
+                                call.respondText("APK not found", status = io.ktor.http.HttpStatusCode.NotFound)
+                            }
+                        } catch (e: Exception) {
+                            Log.e("WebServer", "Error in /download-lite route", e)
                             call.respondText(e.message ?: "Unknown Error", status = io.ktor.http.HttpStatusCode.InternalServerError)
                         }
                     }

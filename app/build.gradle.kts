@@ -62,6 +62,14 @@ android {
     }
   }
 
+  // Both APKs in the app: the full ("mothership") flavor bundles the lite APK
+  // as an asset so its web portal can serve both downloads offline.
+  sourceSets {
+    named("full") {
+      assets.srcDir(layout.buildDirectory.dir("generated/assets/liteSeed"))
+    }
+  }
+
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
@@ -152,4 +160,17 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
+}
+
+// Both APKs in the app: copy the lite APK into the full flavor's generated
+// assets before they are merged, so the mothership portal serves both downloads.
+listOf("Debug", "Release").forEach { bt ->
+  val lower = bt.lowercase()
+  val copyTask = tasks.register("copyLite${bt}ApkForFull", Copy::class) {
+    dependsOn("packageLite$bt")
+    from(layout.buildDirectory.file("outputs/apk/lite/$lower/app-lite-$lower.apk"))
+    into(layout.buildDirectory.dir("generated/assets/liteSeed/seed"))
+    rename { "aetherweb-lite.apk" }
+  }
+  tasks.named("mergeFull${bt}Assets") { dependsOn(copyTask) }
 }

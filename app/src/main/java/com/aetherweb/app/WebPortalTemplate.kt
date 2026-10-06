@@ -16,6 +16,12 @@ object WebPortalTemplate {
     fun getHtml(isLite: Boolean = false): String {
         // Tier-2 "Seed": lite flavor serves a chat-only portal (no voice, games, IDE).
         val voiceBtnHtml = if (isLite) "" else """<button class="action-btn" onclick="toggleVoicePanel()" id="voice-btn" title="Voice Room">🎙</button>"""
+        // Both APKs on the web: full flavor serves its own APK + the bundled lite seed;
+        // lite flavor serves itself (it IS the lite app).
+        val apkButtonsHtml = if (isLite)
+            """<a href="/download" class="action-btn green" download="AetherWeb-lite.apk" title="Download Aether Web Lite">⬇️ Lite</a>"""
+        else
+            """<a href="/download" class="action-btn green" download="AetherWeb.apk" title="Download Aether Web (full)">⬇️ APK</a><a href="/download-lite" class="action-btn green" download="AetherWeb-lite.apk" title="Download Aether Web Lite (small, chat-only)">⬇️ Lite</a>"""
         val voicePanelHtml = if (isLite) "" else """
     <div id="voice-panel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
         <div style="background:var(--card-bg);border-radius:12px;padding:20px;width:320px;max-height:80vh;overflow-y:auto;">
@@ -419,7 +425,7 @@ object WebPortalTemplate {
                 <button class="action-btn" onclick="toggleTheme()" id="theme-btn" title="Toggle Dark/Light">🌓</button>
                 $voiceBtnHtml
                 <button class="action-btn" onclick="toggleBle()" id="ble-btn" title="Connect via Bluetooth (no WiFi needed)">🔵</button>
-                <a href="/download" class="action-btn green" download="MeshChat.apk" title="Download Android APK">⬇️ APK</a>
+                $apkButtonsHtml
             </div>
         </header>
 
