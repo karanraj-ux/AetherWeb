@@ -647,7 +647,7 @@ class WebServerManager(
                             val seedFile = File(ctx.cacheDir, seedName)
                             if (!seedFile.exists()) {
                                 try {
-                                    ctx.assets.open("seed/aetherweb-lite.apk").use { input ->
+                                    ctx.assets.open("aetherweb-lite.apk").use { input ->
                                         seedFile.outputStream().use { input.copyTo(it) }
                                     }
                                 } catch (e: Exception) {

@@ -63,17 +63,9 @@ android {
   }
 
   // Both APKs in the app: the full ("mothership") flavor bundles the lite APK
-  // as an asset so its web portal can serve both downloads offline.
-  // Per-variant source sets keep debug/release outputs in separate dirs,
-  // so no two tasks claim the same output location.
-  sourceSets {
-    named("fullDebug") {
-      assets.srcDir(layout.buildDirectory.get().dir("generated/assets/liteSeed/debug").asFile)
-    }
-    named("fullRelease") {
-      assets.srcDir(layout.buildDirectory.get().dir("generated/assets/liteSeed/release").asFile)
-    }
-  }
+  // as a generated asset so its web portal can serve both downloads offline.
+  // (Wired below via the AGP Variant API, which computes task dependencies
+  // automatically.)
 
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -168,20 +160,20 @@ dependencies {
   "ksp"(libs.moshi.kotlin.codegen)
 }
 
-// Both APKs in the app: copy the lite APK into the full flavor's generated
-// assets before they are merged, so the mothership portal serves both downloads.
-listOf("Debug", "Release").forEach { bt ->
-  val lower = bt.lowercase()
-  val copyTask = tasks.register("copyLite${bt}ApkForFull", Copy::class) {
-    dependsOn("packageLite$bt")
-    from(layout.buildDirectory.file("outputs/apk/lite/$lower/app-lite-$lower.apk"))
-    into(layout.buildDirectory.dir("generated/assets/liteSeed/$lower/seed"))
-    rename { "aetherweb-lite.apk" }
+// Both APKs in the app: the full ("mothership") flavor bundles the lite APK
+// as a generated asset so its web portal can serve both downloads offline.
+// Wired through the AGP Variant API: AGP picks the output dir and computes
+// task dependencies automatically.
+androidComponents {
+  listOf("debug", "release").forEach { bt ->
+    onVariants(selector().withBuildType(bt).withFlavor("tier", "full")) {
+      val btCap = bt.replaceFirstChar { it.uppercaseChar() }
+      val copyTask = tasks.register<Copy>("copyLite${btCap}ApkForFull") {
+        dependsOn("packageLite$btCap")
+        from(layout.buildDirectory.file("outputs/apk/lite/$bt/app-lite-$bt.apk"))
+        rename { "aetherweb-lite.apk" }
+      }
+      it.sources.assets?.addGeneratedSourceDirectory(copyTask) { copy -> copy.destinationDir }
+    }
   }
-  tasks.matching { it.name == "mergeFull${bt}Assets" }.configureEach { dependsOn(copyTask) }
-}
-// Lint/vital tasks also scan the full flavor's assets dir (which includes the
-// generated lite-seed output), so order them after both copy tasks.
-tasks.matching { it.name.contains("Full") && it.name.lowercase().contains("lint") }.configureEach {
-  dependsOn("copyLiteDebugApkForFull", "copyLiteReleaseApkForFull")
 }
