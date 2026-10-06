@@ -791,6 +791,41 @@ class WebServerManager(
                             }
                         }
                     }
+                    // Door 4: service worker so the portal shell loads with WiFi
+                    // off (BLE-only chat). Scope "/" via Service-Worker-Allowed.
+                    get("/sw.js") {
+                        call.response.header("Service-Worker-Allowed", "/")
+                        call.response.header("Cache-Control", "no-cache")
+                        call.respondText(
+                            """
+                            // AetherWeb portal shell cache (Door 4: offline page for BLE chat).
+                            const SW_VERSION = 'aether-sw-v1';
+                            self.addEventListener('install', (e) => { e.waitUntil(self.skipWaiting()); });
+                            self.addEventListener('activate', (e) => {
+                                e.waitUntil(
+                                    caches.keys()
+                                        .then((ks) => Promise.all(ks.filter((k) => k !== SW_VERSION).map((k) => caches.delete(k))))
+                                        .then(() => self.clients.claim())
+                                );
+                            });
+                            self.addEventListener('fetch', (e) => {
+                                if (e.request.method !== 'GET') return;
+                                let path = '/';
+                                try { path = new URL(e.request.url).pathname; } catch (err) {}
+                                if (path === '/chat' || path === '/') {
+                                    e.respondWith(
+                                        fetch(e.request).then((res) => {
+                                            const copy = res.clone();
+                                            caches.open(SW_VERSION).then((c) => { try { c.put(e.request, copy); } catch (err) {} });
+                                            return res;
+                                        }).catch(() => caches.match(e.request).then((hit) => hit || caches.match('/chat')))
+                                    );
+                                }
+                            });
+                            """.trimIndent(),
+                            io.ktor.http.ContentType.Application.JavaScript
+                        )
+                    }
                     get("/chat") {
                         try {
                             DiagnosticLogger.log("Web Client", "Page Load", "Client requested chat HTML", EventStatus.SUCCESS)

@@ -933,6 +933,14 @@ object WebPortalTemplate {
         // Door 4: silent BLE reconnect for returning guests (no picker).
         bleAutoReconnect();
 
+        // Door 4: offline shell so the page loads with WiFi off (BLE-only chat).
+        // Registration failure (e.g. insecure context) must never break the page.
+        try {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
+            }
+        } catch (e) {}
+
         // Voice Room Phase 2: dashboard panel (audio pipe lands in Phase 3).
         let voicePanelState = 'idle'; // idle | requested | joined
         function toggleVoicePanel() {
