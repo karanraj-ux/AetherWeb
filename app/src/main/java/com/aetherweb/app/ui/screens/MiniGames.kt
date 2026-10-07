@@ -28,6 +28,35 @@ fun TicTacToeScreen(
     val isX = state.xPlayerId == myNodeId
     val isO = state.oPlayerId == myNodeId
 
+    // Bot thinking buffer: human-like pause before bot moves, with stale-state guard.
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val stateRef = androidx.compose.runtime.rememberUpdatedState(state)
+    fun triggerBotMove(pending: com.aetherweb.app.TicTacToeState, fastMode: Boolean = false) {
+        val delayMs = com.aetherweb.app.BotThinking.delayMs(fastMode)
+        if (delayMs == 0L) {
+            onStateChange(pending.makeBotMove())
+            return
+        }
+        onStateChange(pending.copy(botThinking = true))
+        scope.launch {
+            kotlinx.coroutines.delay(delayMs)
+            val cur = stateRef.value
+            // Only apply if the game wasn't reset/changed mid-thinking.
+            if (cur.botThinking) {
+                onStateChange(pending.makeBotMove().copy(botThinking = false))
+            }
+        }
+    }
+
+    fun maybeTriggerBotMove(s: com.aetherweb.app.TicTacToeState, fastMode: Boolean = false) {
+        if (s.winner.isNotEmpty()) { onStateChange(s); return }
+        if ((s.isXTurn && s.xPlayerId == "bot") || (!s.isXTurn && s.oPlayerId == "bot")) {
+            triggerBotMove(s, fastMode)
+        } else {
+            onStateChange(s)
+        }
+    }
+
     val isPassAndPlay = state.xPlayerId.isEmpty() && state.oPlayerId.isEmpty()
     val isMyTurn = (state.isXTurn && (isX || isPassAndPlay)) || (!state.isXTurn && (isO || isPassAndPlay))
     val p1 = if (state.xPlayerId == "bot") "🤖 Bot X" else if (state.xPlayerId.isNotEmpty()) state.xPlayerId.take(8) else "Player X"
@@ -45,6 +74,17 @@ fun TicTacToeScreen(
             winner = state.winner
         )
 
+        if (state.botThinking) {
+            Row(
+                modifier = Modifier.padding(top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Text(com.aetherweb.app.BotThinking.THINKING_LABEL, fontSize = 13.sp, color = Color.Gray)
+            }
+        }
+
         Card(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (state.winner.isNotEmpty()) {
@@ -54,9 +94,9 @@ fun TicTacToeScreen(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     if (state.xPlayerId.isEmpty() && state.oPlayerId != myNodeId) {
                         Button(onClick = { onStateChange(state.copy(xPlayerId = myNodeId)) }) { Text("Play X") }
-                        if (state.oPlayerId == myNodeId) Button(onClick = { onStateChange(state.copy(xPlayerId = "bot").maybeBotMove()) }) { Text("Bot X") }
+                        if (state.oPlayerId == myNodeId) Button(onClick = { maybeTriggerBotMove(state.copy(xPlayerId = "bot")) }) { Text("Bot X") }
                     } else if (state.xPlayerId.isEmpty() && state.oPlayerId == myNodeId) {
-                        Button(onClick = { onStateChange(state.copy(xPlayerId = "bot").maybeBotMove()) }) { Text("Add Bot X") }
+                        Button(onClick = { maybeTriggerBotMove(state.copy(xPlayerId = "bot")) }) { Text("Add Bot X") }
                     } else {
                         Text(if(isX) "You are X" else "X: Taken", color = if(isX) MaterialTheme.colorScheme.primary else Color.LightGray)
                     }
@@ -93,7 +133,7 @@ fun TicTacToeScreen(
                                             newBoard[idx] = "X"
                                             val nextState = state.copy(board = newBoard, isXTurn = false).checkWinner()
                                             if (!nextState.isXTurn && nextState.oPlayerId == "bot" && nextState.winner.isEmpty()) {
-                                                onStateChange(nextState.makeBotMove())
+                                                triggerBotMove(nextState)
                                             } else {
                                                 onStateChange(nextState)
                                             }
@@ -102,7 +142,7 @@ fun TicTacToeScreen(
                                             newBoard[idx] = "O"
                                             val nextState = state.copy(board = newBoard, isXTurn = true).checkWinner()
                                             if (nextState.isXTurn && nextState.xPlayerId == "bot" && nextState.winner.isEmpty()) {
-                                                onStateChange(nextState.makeBotMove())
+                                                triggerBotMove(nextState)
                                             } else {
                                                 onStateChange(nextState)
                                             }
@@ -136,6 +176,33 @@ fun Connect4Screen(
     val isRed = state.redPlayerId == myNodeId
     val isYellow = state.yellowPlayerId == myNodeId
 
+    // Bot thinking buffer: human-like pause before bot moves, with stale-state guard.
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val stateRef = androidx.compose.runtime.rememberUpdatedState(state)
+    fun triggerBotMove(pending: com.aetherweb.app.Connect4State, fastMode: Boolean = false) {
+        val delayMs = com.aetherweb.app.BotThinking.delayMs(fastMode)
+        if (delayMs == 0L) {
+            onStateChange(pending.makeBotMove())
+            return
+        }
+        onStateChange(pending.copy(botThinking = true))
+        scope.launch {
+            kotlinx.coroutines.delay(delayMs)
+            if (stateRef.value.botThinking) {
+                onStateChange(pending.makeBotMove().copy(botThinking = false))
+            }
+        }
+    }
+
+    fun maybeTriggerBotMove(s: com.aetherweb.app.Connect4State, fastMode: Boolean = false) {
+        if (s.winner.isNotEmpty()) { onStateChange(s); return }
+        if ((s.isRedTurn && s.redPlayerId == "bot") || (!s.isRedTurn && s.yellowPlayerId == "bot")) {
+            triggerBotMove(s, fastMode)
+        } else {
+            onStateChange(s)
+        }
+    }
+
     val isPassAndPlay = state.redPlayerId.isEmpty() && state.yellowPlayerId.isEmpty()
     val isMyTurn = (state.isRedTurn && (isRed || isPassAndPlay)) || (!state.isRedTurn && (isYellow || isPassAndPlay))
     val p1 = if (state.redPlayerId == "bot") "🤖 Bot Red" else if (state.redPlayerId.isNotEmpty()) state.redPlayerId.take(8) else "Red"
@@ -153,6 +220,17 @@ fun Connect4Screen(
             winner = state.winner
         )
 
+        if (state.botThinking) {
+            Row(
+                modifier = Modifier.padding(top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Text(com.aetherweb.app.BotThinking.THINKING_LABEL, fontSize = 13.sp, color = Color.Gray)
+            }
+        }
+
         Card(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (state.winner.isNotEmpty()) {
@@ -162,7 +240,7 @@ fun Connect4Screen(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     if (state.redPlayerId.isEmpty()) {
                         Button(onClick = { onStateChange(state.copy(redPlayerId = myNodeId)) }) { Text("Play Red") }
-                        Button(onClick = { onStateChange(state.copy(redPlayerId = "bot").maybeBotMove()) }) { Text("🤖 Bot Red") }
+                        Button(onClick = { maybeTriggerBotMove(state.copy(redPlayerId = "bot")) }) { Text("🤖 Bot Red") }
                     } else if (isRed) {
                         Button(onClick = { onStateChange(state.copy(redPlayerId = "")) }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) { Text("Leave") }
                     } else {
@@ -197,7 +275,7 @@ fun Connect4Screen(
                                     newBoard[row][col] = if (state.isRedTurn) 1 else 2
                                     val nextState = state.copy(board = newBoard, isRedTurn = !state.isRedTurn).checkWinner()
                                     if (nextState.winner.isEmpty() && ((nextState.isRedTurn && nextState.redPlayerId == "bot") || (!nextState.isRedTurn && nextState.yellowPlayerId == "bot"))) {
-                                        onStateChange(nextState.makeBotMove())
+                                        triggerBotMove(nextState)
                                     } else {
                                         onStateChange(nextState)
                                     }

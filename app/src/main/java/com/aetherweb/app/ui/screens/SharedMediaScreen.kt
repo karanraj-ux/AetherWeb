@@ -33,6 +33,27 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventPass
 
+/**
+ * Returns the bundled HTML for host-rendered web content, or null if the URL
+ * must go through HTTP (e.g. the portal guest preview).
+ *
+ * The APK already contains the IDE/Pool/Snake HTML, so the host renders it
+ * directly instead of an HTTP round-trip via a possibly-stale IP.
+ */
+private fun bundledWebHtmlFor(url: String): String? {
+    val path = try {
+        android.net.Uri.parse(url).path ?: ""
+    } catch (e: Exception) {
+        ""
+    }
+    return when {
+        path.endsWith("/ide") -> com.aetherweb.app.PocketCdnPacks.WEB_IDE_HTML
+        path.endsWith("/pool") -> com.aetherweb.app.PocketCdnPacks.POOL_GAME_HTML
+        path.endsWith("/snake") -> com.aetherweb.app.PocketCdnPacks.SNAKE_HTML
+        else -> null
+    }
+}
+
 @Composable
 fun SharedMediaScreen(
     uiState: com.aetherweb.app.MeshState,
@@ -229,7 +250,16 @@ fun SharedMediaScreen(
                                 
                                 val base = if (mediaUrl.startsWith("http")) mediaUrl else "http://$defaultHostIp:8080/ide"
                                 val fullUrl = if (base.contains("sim/physics")) base + "?isHost=$isHost" else base
-                                loadUrl(fullUrl)
+                                // Direct-load bundled games/IDE: the APK already contains the HTML,
+                                // so the host renders it locally instead of an HTTP round-trip via a
+                                // possibly-stale IP. Browser guests still use the server.
+                                val bundledHtml = bundledWebHtmlFor(fullUrl)
+                                if (bundledHtml != null) {
+                                    loadDataWithBaseURL("http://127.0.0.1:8080/", bundledHtml, "text/html", "UTF-8", null)
+                                    currentWebUrl = fullUrl
+                                } else {
+                                    loadUrl(fullUrl)
+                                }
                                 webViewInstance = this
                             }
                         },
@@ -240,7 +270,13 @@ fun SharedMediaScreen(
                             val base = if (mediaUrl.startsWith("http")) mediaUrl else "https://$mediaUrl"
                             val targetUrl = if (base.contains("sim/physics")) base + "?isHost=$isHost" else base
                             if (webView.url != targetUrl && mediaUrl.isNotBlank() && targetUrl != currentWebUrl) {
-                                webView.loadUrl(targetUrl)
+                                val bundledHtml = bundledWebHtmlFor(targetUrl)
+                                if (bundledHtml != null) {
+                                    webView.loadDataWithBaseURL("http://127.0.0.1:8080/", bundledHtml, "text/html", "UTF-8", null)
+                                    currentWebUrl = targetUrl
+                                } else {
+                                    webView.loadUrl(targetUrl)
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxSize()

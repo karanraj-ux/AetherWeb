@@ -95,6 +95,21 @@ fun LudoScreen(
     var timeLeftSeconds by remember(state.turn, state.hasRolled, state.winner) { mutableIntStateOf(30) }
     var isTimerPaused by remember { mutableStateOf(false) }
 
+    // Bot thinking buffer: the bot acts ~1.5s after its turn starts (human-like),
+    // not after the 30s timer expires. Stale-state guarded via botThinking flag.
+    val stateRef = androidx.compose.runtime.rememberUpdatedState(state)
+    LaunchedEffect(state.turn, state.winner) {
+        if (state.winner != -1) return@LaunchedEffect
+        val s = state
+        if (s.playerIds[s.turn] != "bot" || s.botThinking) return@LaunchedEffect
+        kotlinx.coroutines.delay(400) // let the turn change render first
+        onStateChange(s.copy(botThinking = true))
+        kotlinx.coroutines.delay(com.aetherweb.app.BotThinking.delayMs())
+        if (stateRef.value.botThinking) {
+            onStateChange(LudoEngine.makeBotMove(s.copy(botThinking = true)).copy(botThinking = false))
+        }
+    }
+
     LaunchedEffect(state.turn, state.hasRolled, isTimerPaused, state.winner) {
         if (state.winner != -1 || isTimerPaused) return@LaunchedEffect
         timeLeftSeconds = 30
@@ -191,6 +206,12 @@ fun LudoScreen(
                                 fontSize = 14.sp
                             )
                             Spacer(modifier = Modifier.width(6.dp))
+                            if (state.botThinking) {
+                                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(com.aetherweb.app.BotThinking.THINKING_LABEL, fontSize = 12.sp, color = Color.Gray)
+                                Spacer(modifier = Modifier.width(6.dp))
+                            }
                             val pid = state.playerIds[state.turn] ?: ""
                             val label = if (pid == "bot") "🤖 Bot" else if (pid == myNodeId) "You" else if (pid.isNotEmpty()) pid.take(4) else "Open"
                             Surface(

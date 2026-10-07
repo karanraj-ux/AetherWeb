@@ -14,7 +14,8 @@ data class LudoState(
         3 to listOf(0, 0, 0, 0)
     ),
     val winner: Int = -1,
-    val playerIds: Map<Int, String> = mapOf(0 to "", 1 to "", 2 to "", 3 to "")
+    val playerIds: Map<Int, String> = mapOf(0 to "", 1 to "", 2 to "", 3 to ""),
+    val botThinking: Boolean = false
 ) {
     fun toJson(): JSONObject {
         val obj = JSONObject()

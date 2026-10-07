@@ -1107,7 +1107,8 @@ class MeshViewModel(application: Application) : AndroidViewModel(application) {
             recipientId = targetRecipient,
             isEmergency = isEmergency,
             isBurner = isBurner,
-            burnerId = currentBurnerId
+            burnerId = currentBurnerId,
+            messageId = newMessage.id
         )
         val chatPayload = chatPacket.toJsonString()
         MeshNetworkManager.meshRouter.routePacket(chatPacket)

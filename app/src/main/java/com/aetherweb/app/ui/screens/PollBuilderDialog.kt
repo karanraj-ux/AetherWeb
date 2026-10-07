@@ -52,12 +52,14 @@ fun PollBuilderDialog(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 if (attachmentUri != null) {
-                    Box(modifier = Modifier.fillMaxWidth().height(150.dp).padding(bottom = 16.dp)) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                         AsyncImage(
                             model = attachmentUri,
                             contentDescription = "Poll Attachment",
-                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            modifier = Modifier.fillMaxWidth()
+                                .heightIn(max = 220.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Fit
                         )
                         IconButton(
                             onClick = { attachmentUri = null },

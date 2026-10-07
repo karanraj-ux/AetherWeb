@@ -33,6 +33,31 @@ fun ChessScreen(
     val p1 = if (state.whitePlayerId == "bot") "🤖 Bot White" else if (state.whitePlayerId.isNotEmpty()) state.whitePlayerId.take(8) else "White"
     val p2 = if (state.blackPlayerId == "bot") "🤖 Bot Black" else if (state.blackPlayerId.isNotEmpty()) state.blackPlayerId.take(8) else "Black"
 
+    // Bot thinking buffer: human-like pause before bot moves, with stale-state guard.
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val stateRef = androidx.compose.runtime.rememberUpdatedState(state)
+    fun triggerBotMove(pending: ChessState, fastMode: Boolean = false) {
+        val delayMs = com.aetherweb.app.BotThinking.delayMs(fastMode)
+        if (delayMs == 0L) {
+            onStateChange(ChessEngine.makeBotMove(pending))
+            return
+        }
+        onStateChange(pending.copy(botThinking = true))
+        scope.launch {
+            kotlinx.coroutines.delay(delayMs)
+            if (stateRef.value.botThinking) {
+                onStateChange(ChessEngine.makeBotMove(pending).copy(botThinking = false))
+            }
+        }
+    }
+
+    fun maybeTriggerBotMove(s: ChessState, fastMode: Boolean = false) {
+        if (s.winner.isNotEmpty()) { onStateChange(s); return }
+        val botToMove = (s.isWhiteTurn && s.whitePlayerId == "bot") ||
+                (!s.isWhiteTurn && s.blackPlayerId == "bot")
+        if (botToMove) triggerBotMove(s, fastMode) else onStateChange(s)
+    }
+
     var selectedIdx by remember { mutableStateOf<Int?>(null) }
 
     Column(modifier = modifier.fillMaxSize().background(Color(0xFF222222)), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -47,6 +72,17 @@ fun ChessScreen(
             isMyTurn = isMyTurn,
             winner = state.winner
         )
+
+        if (state.botThinking) {
+            Row(
+                modifier = Modifier.padding(top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Text(com.aetherweb.app.BotThinking.THINKING_LABEL, fontSize = 13.sp, color = Color.Gray)
+            }
+        }
 
         // Roles & Controls
         Card(
@@ -63,7 +99,7 @@ fun ChessScreen(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     if (state.whitePlayerId.isEmpty()) {
                         Button(onClick = { onStateChange(ChessEngine.claimRole(state, myNodeId, "white")) }) { Text("Play White") }
-                        Button(onClick = { onStateChange(ChessEngine.maybeBotMove(ChessEngine.claimRole(state, "bot", "white"))) }) { Text("🤖 Bot White") }
+                        Button(onClick = { maybeTriggerBotMove(ChessEngine.claimRole(state, "bot", "white")) }) { Text("🤖 Bot White") }
                     } else if (isWhite) {
                         Button(onClick = { onStateChange(ChessEngine.leaveRole(state, myNodeId)) }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) { Text("Leave") }
                     } else {
@@ -72,7 +108,7 @@ fun ChessScreen(
 
                     if (state.blackPlayerId.isEmpty()) {
                         Button(onClick = { onStateChange(ChessEngine.claimRole(state, myNodeId, "black")) }) { Text("Play Black") }
-                        Button(onClick = { onStateChange(ChessEngine.maybeBotMove(ChessEngine.claimRole(state, "bot", "black"))) }) { Text("🤖 Bot Black") }
+                        Button(onClick = { maybeTriggerBotMove(ChessEngine.claimRole(state, "bot", "black")) }) { Text("🤖 Bot Black") }
                     } else if (isBlack) {
                         Button(onClick = { onStateChange(ChessEngine.leaveRole(state, myNodeId)) }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) { Text("Leave") }
                     } else {
@@ -122,7 +158,7 @@ fun ChessScreen(
                                                 selectedIdx = null // Deselect
                                             } else {
                                                 val newState = ChessEngine.move(state, selectedIdx!!, idx, myNodeId)
-                                                onStateChange(newState)
+                                                maybeTriggerBotMove(newState)
                                                 selectedIdx = null
                                             }
                                         }

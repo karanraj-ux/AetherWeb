@@ -35,6 +35,7 @@ object MeshPacketCodec {
                     val burnerId = json.optString("burnerId", "")
                     val isEmergency = json.optBoolean("isEmergency", false)
                     val timestamp = json.optLong("timestamp", System.currentTimeMillis())
+                    val messageId = json.optString("messageId", "")
 
                     MeshPacket.Chat(
                         message = message,
@@ -44,7 +45,8 @@ object MeshPacketCodec {
                         isBurner = isBurner,
                         burnerId = burnerId,
                         isEmergency = isEmergency,
-                        timestamp = timestamp
+                        timestamp = timestamp,
+                        messageId = messageId
                     )
                 }
 

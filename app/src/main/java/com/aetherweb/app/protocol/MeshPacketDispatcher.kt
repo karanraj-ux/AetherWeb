@@ -69,7 +69,7 @@ object MeshPacketDispatcher {
                     }
 
                     val newChatMessage = ChatMessage(
-                        id = messageId.ifBlank { UUID.randomUUID().toString() },
+                        id = packet.messageId.ifBlank { messageId.ifBlank { UUID.randomUUID().toString() } },
                         senderName = resolvedSenderName,
                         senderHandle = packet.senderHandle,
                         senderId = senderId,
@@ -82,7 +82,21 @@ object MeshPacketDispatcher {
                     )
 
                     manager._uiState.update { s ->
-                        s.copy(messages = s.messages + newChatMessage)
+                        // Dedup: skip if this message is already present. Own broadcasts
+                        // loop back through the mesh; without this check every sent
+                        // message appears twice. Prefer the packet's messageId.
+                        val pid = packet.messageId.ifBlank { messageId }
+                        val alreadyPresent = if (pid.isNotBlank()) {
+                            s.messages.any { it.id == pid }
+                        } else {
+                            // Legacy packets without IDs: fuzzy match on content.
+                            s.messages.any {
+                                it.senderId == senderId &&
+                                it.message == displayMessage &&
+                                kotlin.math.abs(it.timestamp - timestamp) < 5000
+                            }
+                        }
+                        if (alreadyPresent) s else s.copy(messages = s.messages + newChatMessage)
                     }
 
                     val isGhostMode = manager._uiState.value.isGhostMode

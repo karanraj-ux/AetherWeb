@@ -8,7 +8,8 @@ data class TicTacToeState(
     val isXTurn: Boolean = true,
     val xPlayerId: String = "",
     val oPlayerId: String = "",
-    val winner: String = ""
+    val winner: String = "",
+    val botThinking: Boolean = false
 ) {
     
     /**
@@ -109,7 +110,8 @@ data class Connect4State(
     val isRedTurn: Boolean = true,
     val redPlayerId: String = "",
     val yellowPlayerId: String = "",
-    val winner: String = ""
+    val winner: String = "",
+    val botThinking: Boolean = false
 ) {
     
     /**

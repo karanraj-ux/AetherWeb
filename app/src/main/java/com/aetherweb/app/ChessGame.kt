@@ -8,7 +8,8 @@ data class ChessState(
     val isWhiteTurn: Boolean = true,
     val whitePlayerId: String = "",
     val blackPlayerId: String = "",
-    val winner: String = "" // "", "White", "Black", "Draw"
+    val winner: String = "", // "", "White", "Black", "Draw"
+    val botThinking: Boolean = false
 ) {
     fun toJson(): JSONObject {
         val obj = JSONObject()
@@ -147,7 +148,9 @@ object ChessEngine {
         
         if (!isValidMove(state, fromIdx, toIdx, piece, isWhitePiece, targetPiece)) return state
 
-        return maybeBotMove(applyMove(state, fromIdx, toIdx, piece, targetPiece))
+        // Bot moves are triggered with a human-like delay by the UI (maybeTriggerBotMove),
+        // not synchronously here — an instant bot feels robotic.
+        return applyMove(state, fromIdx, toIdx, piece, targetPiece)
     }
 
     /**

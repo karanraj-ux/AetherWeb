@@ -19,7 +19,8 @@ sealed class MeshPacket(val packetType: String) {
         val isBurner: Boolean = false,
         val burnerId: String = "",
         val isEmergency: Boolean = false,
-        val timestamp: Long = System.currentTimeMillis()
+        val timestamp: Long = System.currentTimeMillis(),
+        val messageId: String = ""
     ) : MeshPacket(TYPE_CHAT) {
         override fun toJson(): JSONObject = JSONObject().apply {
             put("type", TYPE_CHAT)
@@ -31,6 +32,7 @@ sealed class MeshPacket(val packetType: String) {
             if (burnerId.isNotBlank()) put("burnerId", burnerId)
             if (isEmergency) put("isEmergency", true)
             put("timestamp", timestamp)
+            if (messageId.isNotBlank()) put("messageId", messageId)
         }
     }
 
