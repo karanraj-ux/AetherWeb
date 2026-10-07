@@ -3533,47 +3533,6 @@ fun ArcadeTab(uiState: MeshState, viewModel: MeshViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 7. POCKET CDN FULL WIDTH TILE
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                    viewModel.updateLocalSharedMedia("web", "http://$ip:8080/", com.aetherweb.app.MeshNetworkManager.localNodeId, "local", 0, true)
-                },
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF131C21)),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF33444D))
-        ) {
-            Row(modifier = Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF25D366).copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("🌐", fontSize = 24.sp)
-                }
-                Spacer(modifier = Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Pocket CDN & Web Portal",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Text(
-                        "Multi-tab offline browser with IDE, WebChat & Arcade for Wi-Fi guests",
-                        fontSize = 11.sp,
-                        color = Color(0xFF8696A0)
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-
         Spacer(modifier = Modifier.height(24.dp))
     }
 }

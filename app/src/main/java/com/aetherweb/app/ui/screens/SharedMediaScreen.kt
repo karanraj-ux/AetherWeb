@@ -37,8 +37,8 @@ import androidx.compose.ui.input.pointer.PointerEventPass
  * Returns the bundled HTML for host-rendered web content, or null if the URL
  * must go through HTTP (e.g. the portal guest preview).
  *
- * The APK already contains the IDE/Pool/Snake HTML, so the host renders it
- * directly instead of an HTTP round-trip via a possibly-stale IP.
+ * The APK already contains the IDE/Pool/Snake/Chess HTML, so the host renders
+ * it directly instead of an HTTP round-trip via a possibly-stale IP.
  */
 private fun bundledWebHtmlFor(url: String): String? {
     val path = try {
@@ -52,6 +52,22 @@ private fun bundledWebHtmlFor(url: String): String? {
         path.endsWith("/snake") -> com.aetherweb.app.PocketCdnPacks.SNAKE_HTML
         path.endsWith("/chess") -> com.aetherweb.app.PocketCdnPacks.CHESS_HTML
         else -> null
+    }
+}
+
+/**
+ * Base URL for direct-loaded HTML. Uses 127.0.0.1 (server binds 0.0.0.0) and
+ * preserves the path + query string so page scripts see the right
+ * window.location.host (WebSocket) and window.location.search (e.g. ?isHost).
+ */
+private fun directLoadBaseUrl(targetUrl: String): String {
+    return try {
+        val uri = android.net.Uri.parse(targetUrl)
+        val path = uri.path ?: "/"
+        val query = uri.encodedQuery?.let { "?$it" } ?: ""
+        "http://127.0.0.1:8080$path$query"
+    } catch (e: Exception) {
+        "http://127.0.0.1:8080/"
     }
 }
 
@@ -77,10 +93,10 @@ fun SharedMediaScreen(
     }
 
     val browserTabs = remember(defaultHostIp) {
+        // Host tabs: bundled tools render directly from the APK (no IP/HTTP).
+        // WebChat + Portal are guest-only (browser via QR) — not shown to the host.
         listOf(
             Triple("IDE", "💻 Code IDE", "http://$defaultHostIp:8080/ide"),
-            Triple("Chat", "💬 WebChat", "http://$defaultHostIp:8080/chat"),
-            Triple("Portal", "🌐 Mesh Portal", "http://$defaultHostIp:8080/"),
             Triple("Pool", "🎱 Pool", "http://$defaultHostIp:8080/pool"),
             Triple("Chess", "♟️ Chess", "http://$defaultHostIp:8080/chess"),
             Triple("Snake", "🐍 Snake", "http://$defaultHostIp:8080/snake")
@@ -256,7 +272,7 @@ fun SharedMediaScreen(
                                 // possibly-stale IP. Browser guests still use the server.
                                 val bundledHtml = bundledWebHtmlFor(fullUrl)
                                 if (bundledHtml != null) {
-                                    loadDataWithBaseURL("http://127.0.0.1:8080/", bundledHtml, "text/html", "UTF-8", null)
+                                    loadDataWithBaseURL(directLoadBaseUrl(fullUrl), bundledHtml, "text/html", "UTF-8", null)
                                     currentWebUrl = fullUrl
                                 } else {
                                     loadUrl(fullUrl)
@@ -273,7 +289,7 @@ fun SharedMediaScreen(
                             if (webView.url != targetUrl && mediaUrl.isNotBlank() && targetUrl != currentWebUrl) {
                                 val bundledHtml = bundledWebHtmlFor(targetUrl)
                                 if (bundledHtml != null) {
-                                    webView.loadDataWithBaseURL("http://127.0.0.1:8080/", bundledHtml, "text/html", "UTF-8", null)
+                                    webView.loadDataWithBaseURL(directLoadBaseUrl(targetUrl), bundledHtml, "text/html", "UTF-8", null)
                                     currentWebUrl = targetUrl
                                 } else {
                                     webView.loadUrl(targetUrl)
