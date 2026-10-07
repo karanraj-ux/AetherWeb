@@ -168,14 +168,10 @@ fun MainChatScreen(
     }
 
     // Check if a game is active in fullscreen
-        var isGameMinimized by remember { mutableStateOf(false) }
+    // Minimized flag lives in shared UI state so re-tapping a media card always re-opens it
+    // (a local remember would stay true and swallow the second tap).
+    val isGameMinimized = uiState.isSharedMediaMinimized
     val isGameActive = uiState.sharedMediaType != "none" && uiState.sharedMediaType.isNotEmpty()
-    
-    LaunchedEffect(uiState.sharedMediaType) {
-        if (uiState.sharedMediaType != "none") {
-            isGameMinimized = false
-        }
-    }
 
     var showTopMenu by remember { mutableStateOf(false) }
     var showRoomSetupDialog by remember { mutableStateOf(false) }
@@ -476,7 +472,7 @@ fun MainChatScreen(
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             if (isGameActive && !isGameMinimized) {
                 BackHandler {
-                    isGameMinimized = true
+                    viewModel.setSharedMediaMinimized(true)
                 }
                 // Game Fullscreen View
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -491,7 +487,7 @@ fun MainChatScreen(
                     ) {
                         androidx.compose.material3.TextButton(
                             onClick = { 
-                                isGameMinimized = true
+                                viewModel.setSharedMediaMinimized(true)
                                 currentTab = "Arcade" 
                             }
                         ) {

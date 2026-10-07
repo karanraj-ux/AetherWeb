@@ -95,6 +95,7 @@ data class MeshState(
     val userLocations: Map<String, LocationMessage> = emptyMap(),
     val sharedMediaType: String = "none",
         val sharedMediaUrl: String = "",
+    val isSharedMediaMinimized: Boolean = false,
     val mediaHostId: String = "",
     val mediaMode: String = "collaborative",
     val activePlayers: List<String> = emptyList(),
@@ -800,7 +801,7 @@ class MeshViewModel(application: Application) : AndroidViewModel(application) {
     fun acceptInvite() {
         MeshNetworkManager._uiState.update { state -> 
             state.incomingInvite?.let { invite ->
-                var newState = state.copy(sharedMediaType = invite.type, sharedMediaUrl = invite.url, incomingInvite = null)
+                var newState = state.copy(sharedMediaType = invite.type, sharedMediaUrl = invite.url, incomingInvite = null, isSharedMediaMinimized = false)
                 val myId = MeshNetworkManager.localNodeId
                 when (invite.type) {
                     "tictactoe" -> {
@@ -899,11 +900,18 @@ class MeshViewModel(application: Application) : AndroidViewModel(application) {
         MeshNetworkManager._uiState.update { it.copy(
             sharedMediaType = type, 
             sharedMediaUrl = url,
+            // Re-selecting media always re-opens the viewer, even if it was minimized:
+            // without this, tapping the same card twice does nothing (no state change).
+            isSharedMediaMinimized = false,
             mediaHostId = hostId,
             mediaMode = mode,
             maxSeats = maxSeats,
             activePlayers = if (type != "none" && isHost && maxSeats > 0) listOf(MeshNetworkManager.localNodeId) else emptyList()
         ) }
+    }
+
+    fun setSharedMediaMinimized(minimized: Boolean) {
+        MeshNetworkManager._uiState.update { it.copy(isSharedMediaMinimized = minimized) }
     }
 
     
