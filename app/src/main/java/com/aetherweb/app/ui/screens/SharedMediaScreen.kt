@@ -50,6 +50,7 @@ private fun bundledWebHtmlFor(url: String): String? {
         path.endsWith("/ide") -> com.aetherweb.app.PocketCdnPacks.WEB_IDE_HTML
         path.endsWith("/pool") -> com.aetherweb.app.PocketCdnPacks.POOL_GAME_HTML
         path.endsWith("/snake") -> com.aetherweb.app.PocketCdnPacks.SNAKE_HTML
+        path.endsWith("/chess") -> com.aetherweb.app.PocketCdnPacks.CHESS_HTML
         else -> null
     }
 }
